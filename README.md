@@ -26,7 +26,6 @@ A successful play against a top-tier defense matters more than a successful play
 
 ## 🛠️ How the Data Flows
 
-```text
 [Get Live Game Data] -> [Save Raw Files] -> [Run Math Filters] -> [Print Stats Report]
 ```
 
@@ -40,13 +39,21 @@ Initializing GridironMetrics-CFB Analytics Engine...
 
 --- Pipeline Transformation Matrix ---
 Successfully loaded 4 raw play rows into DataFrame.
+
 Raw Success Rate:             50.0%
+
 Talent-Adjusted Success Index: 31.2
+
 Total Explosive Plays Created: 1
 
 --- Detailed Play Inspection Log ---
+
 Play 1: Run | Dn: 1 | Dist: 10 | Yds Gained: 6 | Success: True | Explosive: False
+
 Play 2: Pass | Dn: 2 | Dist: 8 | Yds Gained: 3 | Success: False | Explosive: False
+
 Play 3: Pass | Dn: 3 | Dist: 4 | Yds Gained: 16 | Success: True | Explosive: True
+
 Play 4: Run | Dn: 4 | Dist: 2 | Yds Gained: 1 | Success: False | Explosive: False
+
 ```

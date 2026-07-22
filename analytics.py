@@ -54,21 +54,47 @@ def calculate_coaching_metrics(df):
     print(f"Talent-Adjusted Success Index: {avg_weighted_success:.1f}")
     print(f"Total Explosive Plays Created: {explosive_count}")
     
+    # --- METRIC 4: RUN/PASS TENDENCY COUNTER ---
+    print("\n--- Coaching Tendency Breakdown ---")
+    
+    # Isolate 1st down plays specifically
+    first_downs = processed_df[processed_df['down'] == 1]
+    total_first_downs = len(first_downs)
+    
+    if total_first_downs > 0:
+        run_count = (first_downs['play_type'] == 'Run').sum()
+        pass_count = (first_downs['play_type'] == 'Pass').sum()
+        print(f"1st Down Play-Calling: Run: {(run_count / total_first_downs) * 100:.1f}% ({run_count}) | Pass: {(pass_count / total_first_downs) * 100:.1f}% ({pass_count})")
+    else:
+        print("No 1st down situational data available.")
+        
+    # Isolate 3rd down plays specifically (The Money Down)
+    third_downs = processed_df[processed_df['down'] == 3]
+    total_third_downs = len(third_downs)
+    
+    if total_third_downs > 0:
+        t_run_count = (third_downs['play_type'] == 'Run').sum()
+        t_pass_count = (third_downs['play_type'] == 'Pass').sum()
+        print(f"3rd Down Play-Calling: Run: {(t_run_count / total_third_downs) * 100:.1f}% ({t_run_count}) | Pass: {(t_pass_count / total_third_downs) * 100:.1f}% ({t_pass_count})")
+    else:
+        print("No 3rd down situational data available.")
+    
     # --- DETAILED PLAY INSPECTION LOG ---
     print("\n--- Detailed Play Inspection Log ---")
     for index, r in processed_df.iterrows():
-        print(f"Play {index + 1}: {r['play_type']} | Dn: {r['down']} | Dist: {r['distance']} | Yds Gained: {r['yards_gained']} | Success: {r['is_success']} | Explosive: {r['is_explosive']}")
+        print(f"Play {index + 1}: {r['play_type']} | Down: {r['down']} | Dist: {r['distance']} | Yds Gained: {r['yards_gained']} | Success: {r['is_success']} | Explosive: {r['is_explosive']}")
         
     return processed_df
 
 if __name__ == "__main__":
-    # Smoke test to verify local environment and imports run without errors
     try:
         print("Initializing GridironMetrics-CFB Analytics Engine...")
         
-        # Mock data array updated to include mock opponent talent scores (0-100 scale)
+        # Pure football data array without any tracking IDs
         mock_data = [
             {"play_type": "Run", "down": 1, "distance": 10, "yards_gained": 6, "opponent_talent": 85.0},   
+            {"play_type": "Run", "down": 1, "distance": 10, "yards_gained": 2, "opponent_talent": 85.0},   
+            {"play_type": "Pass", "down": 1, "distance": 10, "yards_gained": 12, "opponent_talent": 60.0}, 
             {"play_type": "Pass", "down": 2, "distance": 8, "yards_gained": 3, "opponent_talent": 85.0},   
             {"play_type": "Pass", "down": 3, "distance": 4, "yards_gained": 16, "opponent_talent": 40.0},  
             {"play_type": "Run", "down": 4, "distance": 2, "yards_gained": 1, "opponent_talent": 40.0}     
@@ -78,5 +104,4 @@ if __name__ == "__main__":
         results = calculate_coaching_metrics(test_df)
         
     except Exception as e:
-        # Error catch block to instantly output terminal debugging info if it crashes
         print(f"Pipeline Execution Error: {e}")

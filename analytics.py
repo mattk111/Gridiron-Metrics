@@ -50,9 +50,25 @@ def calculate_coaching_metrics(df):
     avg_weighted_success = processed_df['weighted_success'].mean() * 100
     explosive_count = processed_df['is_explosive'].sum()
     
+    # FEATURE 1: EXPLOSIVE PLAY PERCENTAGE TRACKER
+    explosive_pct = (explosive_count / total_plays) * 100
+    
     print(f"Raw Success Rate:             {raw_success_rate:.1f}%")
     print(f"Talent-Adjusted Success Index: {avg_weighted_success:.1f}")
-    print(f"Total Explosive Plays Created: {explosive_count}")
+    print(f"Total Explosive Plays Created: {explosive_count} ({explosive_pct:.1f}% of total plays)")
+    
+    # FEATURE 2: RED ZONE EFFICIENCY FILTER
+    print("\n--- Red Zone Execution Report ---")
+    # Red Zone is defined as being on or inside the opponent's 20-yard line
+    red_zone_plays = processed_df[processed_df['yard_line'] <= 20]
+    total_rz_plays = len(red_zone_plays)
+    
+    if total_rz_plays > 0:
+        rz_success_count = red_zone_plays['is_success'].sum()
+        rz_success_rate = (rz_success_count / total_rz_plays) * 100
+        print(f"Red Zone Success Rate:        {rz_success_rate:.1f}% ({rz_success_count}/{total_rz_plays} successful plays)")
+    else:
+        print("No Red Zone situational data available.")
     
     # --- METRIC 4: RUN/PASS TENDENCY COUNTER ---
     print("\n--- Coaching Tendency Breakdown ---")
@@ -80,9 +96,11 @@ def calculate_coaching_metrics(df):
         print("No 3rd down situational data available.")
     
     # --- DETAILED PLAY INSPECTION LOG ---
+        # --- DETAILED PLAY INSPECTION LOG ---
     print("\n--- Detailed Play Inspection Log ---")
     for index, r in processed_df.iterrows():
-        print(f"Play {index + 1}: {r['play_type']} | Down: {r['down']} | Dist: {r['distance']} | Yds Gained: {r['yards_gained']} | Success: {r['is_success']} | Explosive: {r['is_explosive']}")
+        # Capitalized 'Down:' as requested
+        print(f"Play {index + 1}: {r['play_type']} | Down: {r['down']} | Dist: {r['distance']} | Yds Gained: {r['yards_gained']} | Success: {r['is_success']} | Explosive: {r['is_explosive']} | RZ: {r['yard_line'] <= 20}")
         
     return processed_df
 
@@ -90,14 +108,14 @@ if __name__ == "__main__":
     try:
         print("Initializing GridironMetrics-CFB Analytics Engine...")
         
-        # Pure football data array without any tracking IDs
+        # Mock data array updated to include 'yard_line' field (distance to opponent goal)
         mock_data = [
-            {"play_type": "Run", "down": 1, "distance": 10, "yards_gained": 6, "opponent_talent": 85.0},   
-            {"play_type": "Run", "down": 1, "distance": 10, "yards_gained": 2, "opponent_talent": 85.0},   
-            {"play_type": "Pass", "down": 1, "distance": 10, "yards_gained": 12, "opponent_talent": 60.0}, 
-            {"play_type": "Pass", "down": 2, "distance": 8, "yards_gained": 3, "opponent_talent": 85.0},   
-            {"play_type": "Pass", "down": 3, "distance": 4, "yards_gained": 16, "opponent_talent": 40.0},  
-            {"play_type": "Run", "down": 4, "distance": 2, "yards_gained": 1, "opponent_talent": 40.0}     
+            {"play_type": "Run", "down": 1, "distance": 10, "yards_gained": 6, "opponent_talent": 85.0, "yard_line": 75},   
+            {"play_type": "Run", "down": 1, "distance": 10, "yards_gained": 2, "opponent_talent": 85.0, "yard_line": 69},   
+            {"play_type": "Pass", "down": 1, "distance": 10, "yards_gained": 12, "opponent_talent": 60.0, "yard_line": 45}, 
+            {"play_type": "Pass", "down": 2, "distance": 8, "yards_gained": 3, "opponent_talent": 85.0, "yard_line": 33},   
+            {"play_type": "Pass", "down": 3, "distance": 4, "yards_gained": 16, "opponent_talent": 40.0, "yard_line": 16},  # Inside Red Zone (Success)
+            {"play_type": "Run", "down": 4, "distance": 2, "yards_gained": 1, "opponent_talent": 40.0, "yard_line": 2}      # Inside Red Zone (Fail)
         ]
         
         test_df = pd.DataFrame(mock_data)

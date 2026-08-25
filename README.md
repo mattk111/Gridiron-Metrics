@@ -20,7 +20,10 @@ The tool automatically highlights chunk plays that shift field positioning:
 *   **Rushing Plays:** Any run that gains 10 or more yards.
 
 ### 3. Opponent Quality Weighting
-A successful play against a top-tier defense matters more than a successful play against a weak opponent(Ex: A 3rd & 5 conversion vs Ohio State is more meaningful than one against UConn). The tool automatically adjusts the final success score based on how talented the opponent's roster is.
+A successful play against a top-tier defense matters more than a successful play against a weak opponent. The tool automatically adjusts the final success score based on how talented the opponent's roster is.
+
+### 4. Play-Calling Tendencies
+Automatically calculates down-by-down run/pass ratios so coaches can instantly see team tendencies on 1st down and critical 3rd downs.
 
 ---
 
@@ -35,18 +38,28 @@ A successful play against a top-tier defense matters more than a successful play
 
 When you run the tool, it instantly reads the game data, runs the math, and prints out a clean row-by-row confirmation log like this:
 
+```text
 Initializing GridironMetrics-CFB Analytics Engine...
 
 --- Pipeline Transformation Matrix ---
+<<<<<<< HEAD
 Successfully loaded 4 raw play rows into DataFrame.
 
+=======
+Successfully loaded 6 raw play rows into DataFrame.
+>>>>>>> 86299fa (Update README.md)
 Raw Success Rate:             50.0%
 
 Talent-Adjusted Success Index: 31.2
 
 Total Explosive Plays Created: 1
 
+--- Coaching Tendency Breakdown ---
+1st Down Play-Calling: Run: 66.7% (2) | Pass: 33.3% (1)
+3rd Down Play-Calling: Run: 0.0% (0) | Pass: 100.0% (1)
+
 --- Detailed Play Inspection Log ---
+<<<<<<< HEAD
 
 Play 1: Run | Dn: 1 | Dist: 10 | Yds Gained: 6 | Success: True | Explosive: False
 
@@ -56,4 +69,12 @@ Play 3: Pass | Dn: 3 | Dist: 4 | Yds Gained: 16 | Success: True | Explosive: Tru
 
 Play 4: Run | Dn: 4 | Dist: 2 | Yds Gained: 1 | Success: False | Explosive: False
 
+=======
+Play 1: Run | Down: 1 | Dist: 10 | Yds Gained: 6 | Success: True | Explosive: False
+Play 2: Run | Down: 1 | Dist: 10 | Yds Gained: 2 | Success: False | Explosive: False
+Play 3: Pass | Down: 1 | Dist: 10 | Yds Gained: 12 | Success: True | Explosive: False
+Play 4: Pass | Down: 2 | Dist: 8 | Yds Gained: 3 | Success: False | Explosive: False
+Play 5: Pass | Down: 3 | Dist: 4 | Yds Gained: 16 | Success: True | Explosive: True
+Play 6: Run | Down: 4 | Dist: 2 | Yds Gained: 1 | Success: False | Explosive: False
+>>>>>>> 86299fa (Update README.md)
 ```

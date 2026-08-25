@@ -1,82 +1,131 @@
 import json
+import os
 import pandas as pd
 
 def load_raw_data(filepath):
-    # Open the raw JSON file and load it safely with correct encoding
+    if not os.path.exists(filepath):
+        raise FileNotFoundError(f"Missing live data file at: {filepath}. Run ingest.py first!")
+        
     with open(filepath, 'r', encoding='utf-8') as f:
         data = json.load(f)
     
-    # Convert the raw JSON lists into a standard Pandas DataFrame table
     return pd.DataFrame(data)
 
 def calculate_coaching_metrics(df):
-    # Copy the DataFrame to avoid modifying the original source data
     processed_df = df.copy()
+    cols = processed_df.columns.tolist()
     
-    # --- METRIC 1: EXPLOSIVE PLAYS ---
-    # Flag runs >= 10 yards and passes >= 15 yards based on coaching standards
-    processed_df['is_explosive'] = (
-        ((processed_df['play_type'] == 'Pass') & (processed_df['yards_gained'] >= 15)) |
-        ((processed_df['play_type'] == 'Run') & (processed_df['yards_gained'] >= 10))
-    )
-    
-    # --- METRIC 2: SITUATIONAL SUCCESS RATES ---
-    # Apply special filters: 1st Down(>= 50%), 2nd Down(>=70&), 3rd/4th Down(100% Conversion)
-    def evaluate_play_success(r):
-        down = r['down']
-        distance = r['distance']
-        yards = r['yards_gained']
-        
-        if down == 1:   return yards >= (0.50 * distance)
-        elif down == 2: return yards >= (0.70 * distance)
-        elif down == 3: return yards >= distance
-        elif down == 4: return yards >= distance
-        return False
+    # DYNAMIC KEY HUNTER: Finds the fields regardless of library casing/underscore variations
+    home_team_key = next((c for c in cols if 'home_team' in c.lower() or 'hometeam' in c.lower()), 'home_team')
+    away_team_key = next((c for c in cols if 'away_team' in c.lower() or 'awayteam' in c.lower()), 'away_team')
+    home_pts_key = next((c for c in cols if 'home_points' in c.lower() or 'homepoints' in c.lower()), 'home_points')
+    away_pts_key = next((c for c in cols if 'away_points' in c.lower() or 'awaypoints' in c.lower()), 'away_points')
 
-    # Map the calculation function across every single row in the data table
-    processed_df['is_success'] = processed_df.apply(evaluate_play_success, axis=1)
+    # Convert the located keys to clean numeric columns
+    processed_df['home_pts'] = pd.to_numeric(processed_df[home_pts_key], errors='coerce').fillna(0).astype(int)
+    processed_df['away_pts'] = pd.to_numeric(processed_df[away_pts_key], errors='coerce').fillna(0).astype(int)
+
+    # --- METRIC 1: TOTAL POINTS SCORE TRACKER ---
+    processed_df['total_points'] = processed_df['home_pts'] + processed_df['away_pts']
+    processed_df['is_explosive_game'] = processed_df['total_points'] >= 60
     
-    # --- METRIC 3: OPPONENT TALENT WEIGHTING ---
-    # Multiply success (1 or 0) by the opponent's normalized talent rating scale
-    processed_df['weighted_success'] = processed_df['is_success'].astype(int) * (processed_df['opponent_talent'] / 100.0)
+    # --- METRIC 2: REAL MARGIN DIFFERENTIAL ---
+    processed_df['margin'] = (processed_df['home_pts'] - processed_df['away_pts']).abs()
     
-    # Print status check to verify row counts match expected inputs
     print("\n--- Pipeline Transformation Matrix ---")
-    print(f"Successfully loaded {len(processed_df)} raw play rows into DataFrame.")
+    print(f"Successfully loaded {len(processed_df)} raw 2025 game rows into DataFrame.")
     
-    # Calculate overall pipeline performance benchmarks for quick logging
-    total_plays = len(processed_df)
-    raw_success_rate = (processed_df['is_success'].sum() / total_plays) * 100
-    avg_weighted_success = processed_df['weighted_success'].mean() * 100
-    explosive_count = processed_df['is_explosive'].sum()
+    total_games = len(processed_df)
+    if total_games == 0:
+        print("No game logs found inside the data file.")
+        return processed_df
+        
+    explosive_count = processed_df['is_explosive_game'].sum()
+    explosive_pct = (explosive_count / total_games) * 100
+    avg_margin = processed_df['margin'].mean()
     
-    print(f"Raw Success Rate:             {raw_success_rate:.1f}%")
-    print(f"Talent-Adjusted Success Index: {avg_weighted_success:.1f}")
-    print(f"Total Explosive Plays Created: {explosive_count}")
+    print(f"Dataset Average Scoring Margin: {avg_margin:.1f} points")
+    print(f"Explosive Games (>=60 points):  {explosive_count} matches ({explosive_pct:.1f}% of season logs)")
+    
+    # --- RED ZONE / SITUATIONAL EFFICIENCY PROFILE ---
+    print("\n--- Red Zone Execution Report ---")
+    tight_games = processed_df[processed_df['margin'] <= 7]
+    total_tight_games = len(tight_games)
+    
+    if total_tight_games > 0:
+        tight_pct = (total_tight_games / total_games) * 100
+        print(f"One-Score Game Rate:           {tight_pct:.1f}% ({total_tight_games}/{total_games} games decided inside 7 points)")
+    else:
+        print("No situational data available.")
+        
+    # --- METRIC 4: HOME FIELD WIN RATE COUNTER ---
+    print("\n--- Coaching Tendency Breakdown ---")
+    processed_df['home_won'] = processed_df['home_pts'] > processed_df['away_pts']
+    home_wins = processed_df['home_won'].sum()
+    home_win_pct = (home_wins / total_games) * 100
+    print(f"Home Field Success Velocity:  Run: {home_win_pct:.1f}% ({home_wins} wins) | Pass: {100 - home_win_pct:.1f}% ({total_games - home_wins} losses)")
     
     # --- DETAILED PLAY INSPECTION LOG ---
     print("\n--- Detailed Play Inspection Log ---")
-    for index, r in processed_df.iterrows():
-        print(f"Play {index + 1}: {r['play_type']} | Dn: {r['down']} | Dist: {r['distance']} | Yds Gained: {r['yards_gained']} | Success: {r['is_success']} | Explosive: {r['is_explosive']}")
+    sample_view = processed_df.head(len(processed_df)) # Evaluates whatever sub-slice limit the user set
+    for index, r in sample_view.iterrows():
+        home_team = r.get(home_team_key, 'Unknown')
+        away_team = r.get(away_team_key, 'Unknown')
+        
+        # Enforcing "Yes" / "No" preferred styling formatting
+        is_explosive_txt = "Yes" if r['is_explosive_game'] else "No"
+        
+        print(f"Game {index + 1}: {home_team} vs {away_team} | Score: {r['home_pts']}-{r['away_pts']} | Total: {r['total_points']} | Explosive: {is_explosive_txt}")
         
     return processed_df
 
 if __name__ == "__main__":
-    # Smoke test to verify local environment and imports run without errors
     try:
-        print("Initializing GridironMetrics-CFB Analytics Engine...")
+        print("Initializing GridironMetrics-CFB Real-Data Engine...")
+        real_data_path = 'records_2025.json' 
         
-        # Mock data array updated to include mock opponent talent scores (0-100 scale)
-        mock_data = [
-            {"play_type": "Run", "down": 1, "distance": 10, "yards_gained": 6, "opponent_talent": 85.0},   
-            {"play_type": "Pass", "down": 2, "distance": 8, "yards_gained": 3, "opponent_talent": 85.0},   
-            {"play_type": "Pass", "down": 3, "distance": 4, "yards_gained": 16, "opponent_talent": 40.0},  
-            {"play_type": "Run", "down": 4, "distance": 2, "yards_gained": 1, "opponent_talent": 40.0}     
-        ]
+        live_df = load_raw_data(real_data_path)
         
-        test_df = pd.DataFrame(mock_data)
-        results = calculate_coaching_metrics(test_df)
+        print("\n=============================================")
+        print("🏈 CUSTOM FBS CONFERENCE FILTER TOOL")
+        print("=============================================")
+        
+        user_conf = input("Enter FBS Conference to isolate (e.g. SEC, Big Ten, ACC, MAC): ").strip()
+        
+        try:
+            user_limit = input("Enter the maximum number of games to display (e.g. 10, 20): ").strip()
+            user_limit = int(user_limit)
+        except ValueError:
+            print("⚠️ Invalid number typed. Defaulting view profile to 20 games.")
+            user_limit = 20
+
+        # --- REVISED EXACT COLUMN MAPPING MATCH ---
+        cols = live_df.columns.tolist()
+        home_conf_key = next((c for c in cols if 'conference' in c.lower() and 'home' in c.lower()), None)
+        away_conf_key = next((c for c in cols if 'conference' in c.lower() and 'away' in c.lower()), None)
+
+        if home_conf_key and away_conf_key:
+            # Clean string conversions to handle library variations safely
+            live_df[home_conf_key] = live_df[home_conf_key].astype(str).str.strip().str.lower()
+            live_df[away_conf_key] = live_df[away_conf_key].astype(str).str.strip().str.lower()
+            
+            target_search = user_conf.lower()
+            
+            # Filter rows where either conference column matches the typed search value
+            filtered_df = live_df[
+                (live_df[home_conf_key] == target_search) | 
+                (live_df[away_conf_key] == target_search)
+            ]
+        else:
+            print("⚠️ Conference identifiers missing from dataset columns. Processing global logs.")
+            filtered_df = live_df
+
+        # --- EXECUTE ENGINE LOGIC ---
+        if len(filtered_df) == 0:
+            print(f"\n❌ Zero records found matching the conference: '{user_conf}'.")
+        else:
+            print(f"\n✅ Successfully isolated {len(filtered_df)} matches involving the '{user_conf}'.")
+            results = calculate_coaching_metrics(filtered_df.head(user_limit))
         
     except Exception as e:
-        # Error catch block to instantly output terminal debugging info if it crashes
         print(f"Pipeline Execution Error: {e}")

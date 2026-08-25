@@ -1,35 +1,42 @@
 import os
-import requests
+import json
+import cfbd
 from dotenv import load_dotenv
 
 load_dotenv()
 RAW_KEY = os.getenv("CFBD_API_KEY")
 
-# Automatically injects the precise 'Bearer ' prefix format the server expects
-headers = {
-    "Authorization": f"Bearer {RAW_KEY}",
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-    "Accept": "application/json"
-}
-
-# The single most stable statistical tracking endpoint
-url = "https://collegefootballdata.com"
-
 print("\n=====================================")
-print("RUNNING FINAL SAFE TUNNEL TEST...")
+print("RUNNING LIVE DATA API INGESTION...")
 print("=====================================")
 
 try:
-    response = requests.get(url, headers=headers, timeout=10)
+    # Official V2 System Configuration Layout
+    configuration = cfbd.Configuration(
+        access_token = RAW_KEY
+    )
     
-    if response.status_code == 200:
-        print("SUCCESS! Data pipeline link fully established.")
-        print("Your Python script successfully broke the server redirect loops.")
-        print("=====================================\n")
-    else:
-        print(f"Server Connection Established with Code: {response.status_code}")
-        print("Your script is hitting the right path, but the API key is invalid.")
-        print("Action: Check your email to ensure no characters were missed in your key copy.")
+    # Initialize the secure API tunnel client
+    api_client = cfbd.ApiClient(configuration)
+    api_instance = cfbd.GamesApi(api_client)
+    
+    print("Connecting to secure data server gateway...")
+    # Filters the data stream directly on the server for 2025 FBS-only matchups
+    games_data = api_instance.get_games(year=2025, season_type='regular', classification='fbs')
+    
+    # Convert custom library objects to clean dictionary models before saving
+    raw_json_list = [game.to_dict() for game in games_data]
+    
+    # Save the real structured records straight to your local disk file
+    output_filename = "records_2025.json"
+    with open(output_filename, "w", encoding="utf-8") as f:
+        json.dump(raw_json_list, f, default=str, indent=4)
+        
+    print("SUCCESS! Real college football data pipeline established.")
+    print(f"Saved {len(raw_json_list)} real FBS game records into '{output_filename}'.")
 
 except Exception as error:
-    print(f"Pipeline blocked by local OS file system: {error}")
+    print(f"❌ PIPELINE CONNECTION REJECTED: {error}")
+    print("Action Required: Check your .env file to ensure the API key is active.")
+    
+print("=====================================\n")

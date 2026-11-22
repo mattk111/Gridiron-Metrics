@@ -2,7 +2,7 @@ import os
 import json
 import pandas as pd
 import streamlit as st
-from ingest import get_games_api, get_secret
+from ingest import get_secret, fetch_and_cache_games
 
 CHAMPIONSHIP_DATA = {
     2026: {
@@ -127,41 +127,114 @@ CHAMPIONSHIP_DATA = {
 
 @st.cache_data(ttl=3600)
 def fetch_season_records_df(year: int) -> pd.DataFrame:
-    """Fetches FBS team season records via cfbd GamesApi and caches locally."""
+    """Computes FBS team season records directly from cached game results (records_{year}.json)."""
     output_dir = get_secret("OUTPUT_DIR", "./data")
-    os.makedirs(output_dir, exist_ok=True)
-    cache_path = os.path.join(output_dir, f"team_records_{year}.json")
+    filepath = os.path.join(output_dir, f"records_{year}.json")
 
-    if os.path.exists(cache_path) and year != 2026:
-        with open(cache_path, "r", encoding="utf-8") as f:
-            raw_list = json.load(f)
-    else:
-        games_api = get_games_api()
-        records_data = games_api.get_team_records(year=int(year))
-        raw_list = [r.to_dict() for r in records_data]
-        if raw_list:
-            with open(cache_path, "w", encoding="utf-8") as f:
-                json.dump(raw_list, f, default=str, indent=4)
+    if not os.path.exists(filepath):
+        fetch_and_cache_games(year=int(year))
+
+    if not os.path.exists(filepath):
+        return pd.DataFrame()
+
+    with open(filepath, "r", encoding="utf-8") as f:
+        games_list = json.load(f)
+
+    if not games_list:
+        return pd.DataFrame()
+
+    df = pd.DataFrame(games_list)
+    cols = df.columns.tolist()
+
+    home_team_key = next((c for c in cols if "home_team" in c.lower() or "hometeam" in c.lower()), "home_team")
+    away_team_key = next((c for c in cols if "away_team" in c.lower() or "awayteam" in c.lower()), "away_team")
+    home_pts_key = next((c for c in cols if "home_points" in c.lower() or "homepoints" in c.lower()), "home_points")
+    away_pts_key = next((c for c in cols if "away_points" in c.lower() or "awaypoints" in c.lower()), "away_points")
+    home_conf_key = next((c for c in cols if "conference" in c.lower() and "home" in c.lower()), None)
+    away_conf_key = next((c for c in cols if "conference" in c.lower() and "away" in c.lower()), None)
+    home_class_key = next((c for c in cols if "classification" in c.lower() and "home" in c.lower()), None)
+    away_class_key = next((c for c in cols if "classification" in c.lower() and "away" in c.lower()), None)
+
+    df["h_pts"] = pd.to_numeric(df[home_pts_key], errors="coerce")
+    df["a_pts"] = pd.to_numeric(df[away_pts_key], errors="coerce")
+    completed = df.dropna(subset=["h_pts", "a_pts"]).copy()
+
+    standings = {}
+
+    def _ensure_team(team, conf, classification):
+        if not team or (classification and str(classification).lower() != "fbs"):
+            return False
+        if team not in standings:
+            standings[team] = {
+                "Team": team,
+                "Conference": conf if conf and str(conf) != "None" else "Independent",
+                "Wins": 0,
+                "Losses": 0,
+            }
+        return True
+
+    for _, row in completed.iterrows():
+        ht = row.get(home_team_key)
+        at = row.get(away_team_key)
+        hc = row.get(home_conf_key) if home_conf_key else None
+        ac = row.get(away_conf_key) if away_conf_key else None
+        h_cls = row.get(home_class_key) if home_class_key else "fbs"
+        a_cls = row.get(away_class_key) if away_class_key else "fbs"
+
+        hp = int(row["h_pts"])
+        ap = int(row["a_pts"])
+
+        h_ok = _ensure_team(ht, hc, h_cls)
+        a_ok = _ensure_team(at, ac, a_cls)
+
+        if hp > ap:
+            if h_ok:
+                standings[ht]["Wins"] += 1
+            if a_ok:
+                standings[at]["Losses"] += 1
+        elif ap > hp:
+            if a_ok:
+                standings[at]["Wins"] += 1
+            if h_ok:
+                standings[ht]["Losses"] += 1
 
     rows = []
-    for rec in raw_list:
-        classification = str(rec.get("classification") or "").lower()
-        if classification and classification != "fbs":
-            continue
-        total = rec.get("total") or {}
-        wins = int(total.get("wins") or 0)
-        losses = int(total.get("losses") or 0)
-        games = wins + losses
-        win_pct = (wins / games) if games > 0 else 0.0
+    for team_data in standings.values():
+        w = team_data["Wins"]
+        l = team_data["Losses"]
+        total_games = w + l
+        win_pct = (w / total_games) if total_games > 0 else 0.0
         rows.append({
-            "Team": rec.get("team"),
-            "Conference": rec.get("conference") or "Independent",
-            "Wins": wins,
-            "Losses": losses,
-            "Record": f"{wins}-{losses}",
+            "Team": team_data["Team"],
+            "Conference": team_data["Conference"],
+            "Wins": w,
+            "Losses": l,
+            "Record": f"{w}-{l}",
             "Win %": round(win_pct, 3),
         })
+
     return pd.DataFrame(rows)
+
+
+def _render_champ_card(label: str, team_text: str, badge_text: str = None):
+    """Renders a compact championship card with small, clean typography that fits at 100% zoom."""
+    badge_html = (
+        f"<div style='margin-top:5px;'>"
+        f"<span style='display:inline-block; padding:2px 8px; border-radius:999px; "
+        f"background-color:rgba(16, 185, 129, 0.2); color:#6ee7b7; font-size:0.75rem; font-weight:600;'>"
+        f"{badge_text}</span></div>"
+        if badge_text else ""
+    )
+    st.markdown(
+        f"""
+        <div style="padding: 10px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12); background-color: rgba(255,255,255,0.03);">
+            <div style="font-size: 0.78rem; color: #9ca3af; margin-bottom: 3px;">{label}</div>
+            <div style="font-size: 0.98rem; font-weight: 700; line-height: 1.25;">{team_text}</div>
+            {badge_html}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_season_recap(selected_year: int):
@@ -170,24 +243,25 @@ def render_season_recap(selected_year: int):
 
     meta = CHAMPIONSHIP_DATA.get(selected_year, {})
 
-    # --- NATIONAL CHAMPION & RUNNER-UP ---
+    # --- COMPACT NATIONAL CHAMPION & RUNNER-UP CARDS ---
     col1, col2 = st.columns(2)
     with col1:
-        st.metric(
+        score = meta.get("title_score")
+        _render_champ_card(
             label="🥇 National Champion",
-            value=meta.get("national_champion", "N/A"),
-            delta=f"Title Game: {meta.get('title_score')}" if meta.get("title_score") and meta.get("title_score") != "—" else None,
+            team_text=meta.get("national_champion", "N/A"),
+            badge_text=f"Title Game: {score}" if score and score != "—" else None,
         )
     with col2:
-        st.metric(
+        _render_champ_card(
             label="🥈 National Runner-Up",
-            value=meta.get("runner_up", "N/A"),
+            team_text=meta.get("runner_up", "N/A"),
         )
 
     st.divider()
 
     # --- BEST & WORST RECORD TEAMS ---
-    with st.spinner(f"Loading {selected_year} FBS team records..."):
+    with st.spinner(f"Calculating {selected_year} FBS team records..."):
         try:
             df_records = fetch_season_records_df(selected_year)
         except Exception as e:

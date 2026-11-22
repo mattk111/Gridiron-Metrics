@@ -33,20 +33,20 @@ def get_games_api():
 def get_plays_api():
     return cfbd.PlaysApi(cfbd.ApiClient(get_api_configuration()))
 
-def fetch_and_cache_games(year: int = 2025, classification: str = 'fbs', season_type: str = 'regular'):
+def fetch_and_cache_games(year: int = 2026, classification: str = 'fbs', season_type: str = 'both'):
     """
-    Fetches raw game records from the CFBD GamesApi and caches them to a local JSON file.
+    Fetches raw game records (regular + postseason) for any season (2020-2026) and caches locally.
     """
     print("\n=====================================")
-    print("RUNNING LIVE GAME DATA INGESTION...")
+    print(f"RUNNING LIVE GAME DATA INGESTION ({year})...")
     print("=====================================")
 
     try:
         games_api = get_games_api()
         output_dir = get_secret("OUTPUT_DIR", "./data")
         
-        print("Connecting to secure data server gateway...")
-        games_data = games_api.get_games(year=year, season_type=season_type, classification=classification)
+        print(f"Connecting to secure data server gateway for {year} season...")
+        games_data = games_api.get_games(year=int(year), season_type=season_type, classification=classification)
         
         raw_json_list = [game.to_dict() for game in games_data]
         
@@ -56,22 +56,20 @@ def fetch_and_cache_games(year: int = 2025, classification: str = 'fbs', season_
         with open(output_filename, "w", encoding="utf-8") as f:
             json.dump(raw_json_list, f, default=str, indent=4)
             
-        print("SUCCESS! Real college football game data pipeline established.")
-        print(f"Saved {len(raw_json_list)} real FBS game records into '{output_filename}'.")
+        print(f"SUCCESS! Saved {len(raw_json_list)} FBS game records into '{output_filename}'.")
         return output_filename
 
     except Exception as error:
-        print(f"❌ PIPELINE CONNECTION REJECTED: {error}")
-        print("Action Required: Check your .env file or Streamlit Secrets to ensure the API key is active.")
+        print(f"❌ PIPELINE CONNECTION REJECTED ({year}): {error}")
         raise error
 
     finally:
         print("=====================================\n")
 
-def fetch_game_team_stats(year: int = 2025, team: str = None):
+def fetch_game_team_stats(year: int = 2026, team: str = None):
     """
-    Fetches detailed box score team statistics for a given team/year.
-    Caches locally to disk to minimize network calls.
+    Fetches detailed box score team statistics for a given team and season.
+    Caches locally per team/year.
     """
     try:
         games_api = get_games_api()
@@ -88,9 +86,9 @@ def fetch_game_team_stats(year: int = 2025, team: str = None):
         print(f"Fetching detailed game team stats for {team if team else 'FBS'} ({year})...")
         
         if team:
-            box_stats = games_api.get_game_team_stats(year=year, team=team)
+            box_stats = games_api.get_game_team_stats(year=int(year), team=team)
         else:
-            box_stats = games_api.get_game_team_stats(year=year)
+            box_stats = games_api.get_game_team_stats(year=int(year))
 
         raw_box_list = [game.to_dict() for game in box_stats]
 
@@ -103,10 +101,10 @@ def fetch_game_team_stats(year: int = 2025, team: str = None):
         print(f"❌ STATS INGESTION REJECTED: {error}")
         return []
 
-def fetch_game_plays(year: int = 2025, week: int = 1, team: str = None):
+def fetch_game_plays(year: int = 2026, week: int = 1, team: str = None):
     """
-    Fetches play-by-play telemetry for a specific team and week using PlaysApi.get_plays().
-    Caches locally per team/week so repeated inspections load instantly.
+    Fetches play-by-play telemetry for a specific team, week, and season.
+    Caches locally per team/week/year.
     """
     try:
         plays_api = get_plays_api()
@@ -121,7 +119,7 @@ def fetch_game_plays(year: int = 2025, week: int = 1, team: str = None):
                 return json.load(f)
 
         print(f"Fetching play-by-play telemetry for {team} - Week {week} ({year})...")
-        plays_data = plays_api.get_plays(year=year, week=int(week), team=team)
+        plays_data = plays_api.get_plays(year=int(year), week=int(week), team=team)
         raw_plays_list = [play.to_dict() for play in plays_data]
 
         with open(output_filename, "w", encoding="utf-8") as f:
@@ -134,4 +132,5 @@ def fetch_game_plays(year: int = 2025, week: int = 1, team: str = None):
         return []
 
 if __name__ == "__main__":
-    fetch_and_cache_games(year=2025)
+    for yr in range(2020, 2027):
+        fetch_and_cache_games(year=yr)

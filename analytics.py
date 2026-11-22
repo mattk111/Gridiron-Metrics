@@ -82,11 +82,35 @@ def parse_game_box_stats(game_id: int, team_name: str, year: int = 2025) -> dict
 
     return parsed_stats
 
+def _build_roster_position_lookup(year: int, team_name: str) -> tuple[dict, dict]:
+    """
+    Builds (id_to_pos, normalized_name_to_pos) maps from cached team roster data.
+    """
+    from ingest import fetch_team_roster
+    roster = fetch_team_roster(year=year, team=team_name)
+    id_map = {}
+    name_map = {}
+
+    for p in roster:
+        pos = str(p.get('position') or '').strip().upper()
+        if not pos:
+            continue
+        p_id = p.get('id')
+        if p_id is not None:
+            id_map[str(p_id)] = pos
+
+        first = str(p.get('first_name') or p.get('firstName') or '').strip()
+        last = str(p.get('last_name') or p.get('lastName') or '').strip()
+        full_name = f"{first} {last}".strip().lower()
+        if full_name:
+            name_map[full_name] = pos
+
+    return id_map, name_map
+
 def parse_game_player_leaders(game_id: int, team_name: str, year: int = 2025) -> dict:
     """
     Extracts the statistical leader in passing, rushing, and receiving yards
-    for each team in a given game.
-    Returns: {team_name: {"passing": {"player": ..., "yards": ..., "summary": ...}, ...}}
+    for each team in a given game, prefixed with their roster position (e.g., 'QB Jayden Daniels').
     """
     from ingest import fetch_game_player_stats
     player_records = fetch_game_player_stats(year=year, team=team_name)
@@ -107,6 +131,7 @@ def parse_game_player_leaders(game_id: int, team_name: str, year: int = 2025) ->
     for team_entry in selected_game.get('teams', []):
         t_name = team_entry.get('school') or team_entry.get('team')
         leaders_by_team[t_name] = {cat: None for cat in target_categories}
+        id_map, name_map = _build_roster_position_lookup(year=year, team_name=t_name)
 
         for cat_entry in team_entry.get('categories', []):
             cat_name = str(cat_entry.get('name', '')).lower()
@@ -119,9 +144,10 @@ def parse_game_player_leaders(game_id: int, team_name: str, year: int = 2025) ->
                 stat_type = str(type_entry.get('name', '')).upper()
                 for athlete in type_entry.get('athletes', []):
                     p_name = athlete.get('name', 'Unknown')
+                    p_id = athlete.get('id')
                     stat_val = athlete.get('stat', '0')
                     if p_name not in player_stats_map:
-                        player_stats_map[p_name] = {}
+                        player_stats_map[p_name] = {"_id": p_id}
                     player_stats_map[p_name][stat_type] = stat_val
 
             # Identify the player with the highest YDS in this category
@@ -141,6 +167,11 @@ def parse_game_player_leaders(game_id: int, team_name: str, year: int = 2025) ->
                     best_raw_stats = stats_dict
 
             if best_player is not None:
+                # Look up roster position via athlete ID first, then normalized name
+                p_id_str = str(best_raw_stats.get("_id")) if best_raw_stats.get("_id") is not None else ""
+                pos = id_map.get(p_id_str) or name_map.get(best_player.strip().lower(), "")
+                player_display = f"{pos} {best_player}".strip() if pos else best_player
+
                 yds_int = int(best_yards) if best_yards.is_integer() else best_yards
                 if cat_name == 'passing':
                     c_att = best_raw_stats.get('C/ATT', '')
@@ -157,9 +188,9 @@ def parse_game_player_leaders(game_id: int, team_name: str, year: int = 2025) ->
                     detail = f"{rec} REC, {yds_int} YDS, {tds} TD"
 
                 leaders_by_team[t_name][cat_name] = {
-                    "player": best_player,
+                    "player": player_display,
                     "yards": best_yards,
-                    "summary": f"{best_player} ({detail})"
+                    "summary": f"{player_display} ({detail})"
                 }
 
     return leaders_by_team

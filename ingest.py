@@ -33,6 +33,9 @@ def get_games_api():
 def get_plays_api():
     return cfbd.PlaysApi(cfbd.ApiClient(get_api_configuration()))
 
+def get_teams_api():
+    return cfbd.TeamsApi(cfbd.ApiClient(get_api_configuration()))
+
 def fetch_and_cache_games(year: int = 2026, classification: str = 'fbs', season_type: str = 'both'):
     """
     Fetches raw game records (regular + postseason) for any season (2020-2026) and caches locally.
@@ -65,6 +68,38 @@ def fetch_and_cache_games(year: int = 2026, classification: str = 'fbs', season_
 
     finally:
         print("=====================================\n")
+
+def fetch_team_roster(year: int = 2026, team: str = None):
+    """
+    Fetches team roster for a given team and season to map athlete IDs/names to positions.
+    Caches locally per team/year.
+    """
+    if not team:
+        return []
+    try:
+        teams_api = get_teams_api()
+        output_dir = get_secret("OUTPUT_DIR", "./data")
+        os.makedirs(output_dir, exist_ok=True)
+
+        clean_team = team.lower().replace(' ', '_')
+        output_filename = os.path.join(output_dir, f"roster_{clean_team}_{year}.json")
+
+        if os.path.exists(output_filename):
+            with open(output_filename, "r", encoding="utf-8") as f:
+                return json.load(f)
+
+        print(f"Fetching roster positions for {team} ({year})...")
+        roster_data = teams_api.get_roster(year=int(year), team=team)
+        raw_roster_list = [player.to_dict() for player in roster_data]
+
+        with open(output_filename, "w", encoding="utf-8") as f:
+            json.dump(raw_roster_list, f, default=str, indent=4)
+
+        return raw_roster_list
+
+    except Exception as error:
+        print(f"❌ ROSTER INGESTION REJECTED ({team} {year}): {error}")
+        return []
 
 def fetch_game_team_stats(year: int = 2026, team: str = None):
     """

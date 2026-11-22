@@ -7,6 +7,7 @@ from analytics import (
     get_teams_by_conference, 
     get_team_schedule, 
     parse_game_box_stats,
+    parse_game_player_leaders,
     get_game_plays_df
 )
 
@@ -81,6 +82,26 @@ def style_box_score_winner(row, away_col, home_col):
     else:
         styles[col_names.index(home_col)] = win_style
         
+    return styles
+
+def style_leader_winner(row, away_col, home_col, away_yards_list, home_yards_list):
+    """Highlights the statistical leader cell with higher yardage in each category."""
+    styles = [''] * len(row)
+    idx = row.name
+    a_yds = away_yards_list[idx]
+    h_yds = home_yards_list[idx]
+
+    if a_yds is None or h_yds is None or a_yds == h_yds:
+        return styles
+
+    win_style = 'background-color: rgba(16, 185, 129, 0.28); color: #ecfdf5; font-weight: 700;'
+    col_names = list(row.index)
+
+    if a_yds > h_yds:
+        styles[col_names.index(away_col)] = win_style
+    else:
+        styles[col_names.index(home_col)] = win_style
+
     return styles
 
 def format_play_clock(clock_val):
@@ -369,7 +390,7 @@ app_mode = st.sidebar.radio(
 # =====================================================================
 if app_mode == "Single Game Inspector":
     st.title(f"🔍 {selected_season} CFB Single Game Box Score Inspector")
-    st.markdown(f"Drill down through **Conference ➔ Team ➔ Schedule** to view full **{selected_season}** match statistics and timestamped plays.")
+    st.markdown(f"Drill down through **Conference ➔ Team ➔ Schedule** to view full **{selected_season}** match statistics, statistical leaders, and timestamped plays.")
 
     with st.spinner(f"Loading {selected_season} season schedule..."):
         df_games = load_game_data(selected_season)
@@ -393,7 +414,7 @@ if app_mode == "Single Game Inspector":
             st.metric(label=f"Home: {home_team}", value=f"{home_score} Pts" if is_completed else "Scheduled")
 
         if not is_completed:
-            st.info(f"📅 This {selected_season} matchup ({away_team} @ {home_team}) has not been played yet. Box score and play-by-play telemetry will populate once the game is underway or completed.")
+            st.info(f"📅 This {selected_season} matchup ({away_team} @ {home_team}) has not been played yet. Box score, player leaders, and play-by-play telemetry will populate once the game is underway or completed.")
         else:
             # --- DETAILED BOX SCORE TELEMETRY ---
             st.subheader("📊 Official Team Box Score Telemetry")
@@ -429,6 +450,49 @@ if app_mode == "Single Game Inspector":
                 st.dataframe(styled_comparison, width="stretch", hide_index=True)
             else:
                 st.info("Detailed box score stats are currently unavailable or not yet published for this game.")
+
+            # --- INDIVIDUAL STATISTICAL LEADERS (PASSING, RUSHING, RECEIVING) ---
+            st.divider()
+            st.subheader("🌟 Individual Statistical Leaders")
+            st.caption("Top yardage performer per team in Passing, Rushing, and Receiving (🟩 highlights the higher yardage total).")
+            
+            with st.spinner(f"Loading individual player leaders for {away_team} @ {home_team}..."):
+                leaders_data = parse_game_player_leaders(game_id=selected_game_id, team_name=selected_team, year=selected_season)
+
+            if leaders_data:
+                away_leaders = leaders_data.get(away_team, {})
+                home_leaders = leaders_data.get(home_team, {})
+
+                leader_categories = [
+                    ("🎯 Passing Yards Leader", "passing"),
+                    ("🏃 Rushing Yards Leader", "rushing"),
+                    ("🙌 Receiving Yards Leader", "receiving"),
+                ]
+
+                leader_rows = []
+                away_yards_list = []
+                home_yards_list = []
+
+                for label, cat_key in leader_categories:
+                    a_entry = away_leaders.get(cat_key)
+                    h_entry = home_leaders.get(cat_key)
+
+                    leader_rows.append({
+                        "Category": label,
+                        away_team: a_entry["summary"] if a_entry else "N/A",
+                        home_team: h_entry["summary"] if h_entry else "N/A",
+                    })
+                    away_yards_list.append(a_entry["yards"] if a_entry else None)
+                    home_yards_list.append(h_entry["yards"] if h_entry else None)
+
+                leaders_df = pd.DataFrame(leader_rows)
+                styled_leaders = leaders_df.style.apply(
+                    lambda r: style_leader_winner(r, away_team, home_team, away_yards_list, home_yards_list),
+                    axis=1
+                )
+                st.dataframe(styled_leaders, width="stretch", hide_index=True)
+            else:
+                st.info("Individual player box score stats are not available for this game.")
 
             # --- GAME PLAY-BY-PLAY LOG (CHRONOLOGICAL WITH QUARTER, TIME & RUNNING SCORE) ---
             st.divider()
@@ -492,7 +556,6 @@ elif app_mode == "Game Analysis Engine":
         away_pts_key = next((c for c in cols if 'away_points' in c.lower() or 'awaypoints' in c.lower()), 'away_points')
         home_conf_key = next((c for c in cols if 'conference' in c.lower() and 'home' in c.lower()), None)
 
-        # Filter to completed games for scoring margin metrics
         df_games['raw_home_pts'] = pd.to_numeric(df_games[home_pts_key], errors='coerce')
         df_games['raw_away_pts'] = pd.to_numeric(df_games[away_pts_key], errors='coerce')
         completed_games = df_games.dropna(subset=['raw_home_pts', 'raw_away_pts']).copy()

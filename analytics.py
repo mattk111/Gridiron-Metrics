@@ -82,6 +82,88 @@ def parse_game_box_stats(game_id: int, team_name: str, year: int = 2025) -> dict
 
     return parsed_stats
 
+def parse_game_player_leaders(game_id: int, team_name: str, year: int = 2025) -> dict:
+    """
+    Extracts the statistical leader in passing, rushing, and receiving yards
+    for each team in a given game.
+    Returns: {team_name: {"passing": {"player": ..., "yards": ..., "summary": ...}, ...}}
+    """
+    from ingest import fetch_game_player_stats
+    player_records = fetch_game_player_stats(year=year, team=team_name)
+
+    selected_game = None
+    for record in player_records:
+        rec_id = record.get('id') or record.get('game_id')
+        if str(rec_id) == str(game_id):
+            selected_game = record
+            break
+
+    if not selected_game:
+        return {}
+
+    target_categories = ['passing', 'rushing', 'receiving']
+    leaders_by_team = {}
+
+    for team_entry in selected_game.get('teams', []):
+        t_name = team_entry.get('school') or team_entry.get('team')
+        leaders_by_team[t_name] = {cat: None for cat in target_categories}
+
+        for cat_entry in team_entry.get('categories', []):
+            cat_name = str(cat_entry.get('name', '')).lower()
+            if cat_name not in target_categories:
+                continue
+
+            # Build per-player stat map for this category (e.g. YDS, TD, INT, CAR, REC, C/ATT)
+            player_stats_map = {}
+            for type_entry in cat_entry.get('types', []):
+                stat_type = str(type_entry.get('name', '')).upper()
+                for athlete in type_entry.get('athletes', []):
+                    p_name = athlete.get('name', 'Unknown')
+                    stat_val = athlete.get('stat', '0')
+                    if p_name not in player_stats_map:
+                        player_stats_map[p_name] = {}
+                    player_stats_map[p_name][stat_type] = stat_val
+
+            # Identify the player with the highest YDS in this category
+            best_player = None
+            best_yards = float('-inf')
+            best_raw_stats = {}
+
+            for p_name, stats_dict in player_stats_map.items():
+                try:
+                    yds = float(stats_dict.get('YDS', 0))
+                except (ValueError, TypeError):
+                    yds = 0.0
+
+                if yds > best_yards:
+                    best_yards = yds
+                    best_player = p_name
+                    best_raw_stats = stats_dict
+
+            if best_player is not None:
+                yds_int = int(best_yards) if best_yards.is_integer() else best_yards
+                if cat_name == 'passing':
+                    c_att = best_raw_stats.get('C/ATT', '')
+                    tds = best_raw_stats.get('TD', '0')
+                    ints = best_raw_stats.get('INT', '0')
+                    detail = f"{c_att}, {yds_int} YDS, {tds} TD, {ints} INT" if c_att else f"{yds_int} YDS, {tds} TD, {ints} INT"
+                elif cat_name == 'rushing':
+                    car = best_raw_stats.get('CAR', '0')
+                    tds = best_raw_stats.get('TD', '0')
+                    detail = f"{car} CAR, {yds_int} YDS, {tds} TD"
+                else:  # receiving
+                    rec = best_raw_stats.get('REC', '0')
+                    tds = best_raw_stats.get('TD', '0')
+                    detail = f"{rec} REC, {yds_int} YDS, {tds} TD"
+
+                leaders_by_team[t_name][cat_name] = {
+                    "player": best_player,
+                    "yards": best_yards,
+                    "summary": f"{best_player} ({detail})"
+                }
+
+    return leaders_by_team
+
 def get_game_plays_df(game_id: int, week: int, team_name: str, year: int = 2025) -> pd.DataFrame:
     """
     Fetches play-by-play records for a specific team/week and isolates the exact game_id.
@@ -107,8 +189,6 @@ def calculate_coaching_metrics(df: pd.DataFrame) -> pd.DataFrame:
     processed_df = df.copy()
     cols = processed_df.columns.tolist()
     
-    home_team_key = next((c for c in cols if 'home_team' in c.lower() or 'hometeam' in c.lower()), 'home_team')
-    away_team_key = next((c for c in cols if 'away_team' in c.lower() or 'awayteam' in c.lower()), 'away_team')
     home_pts_key = next((c for c in cols if 'home_points' in c.lower() or 'homepoints' in c.lower()), 'home_points')
     away_pts_key = next((c for c in cols if 'away_points' in c.lower() or 'awaypoints' in c.lower()), 'away_points')
 

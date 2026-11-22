@@ -101,6 +101,41 @@ def fetch_game_team_stats(year: int = 2026, team: str = None):
         print(f"❌ STATS INGESTION REJECTED: {error}")
         return []
 
+def fetch_game_player_stats(year: int = 2026, team: str = None):
+    """
+    Fetches individual player box score statistics for a given team and season.
+    Caches locally per team/year to minimize API calls.
+    """
+    try:
+        games_api = get_games_api()
+        output_dir = get_secret("OUTPUT_DIR", "./data")
+        os.makedirs(output_dir, exist_ok=True)
+
+        clean_team = team.lower().replace(' ', '_') if team else "all"
+        output_filename = os.path.join(output_dir, f"player_stats_{clean_team}_{year}.json")
+
+        if os.path.exists(output_filename):
+            with open(output_filename, "r", encoding="utf-8") as f:
+                return json.load(f)
+
+        print(f"Fetching individual player game stats for {team if team else 'FBS'} ({year})...")
+        
+        if team:
+            player_stats = games_api.get_game_player_stats(year=int(year), team=team)
+        else:
+            player_stats = games_api.get_game_player_stats(year=int(year))
+
+        raw_player_list = [game.to_dict() for game in player_stats]
+
+        with open(output_filename, "w", encoding="utf-8") as f:
+            json.dump(raw_player_list, f, default=str, indent=4)
+
+        return raw_player_list
+
+    except Exception as error:
+        print(f"❌ PLAYER STATS INGESTION REJECTED: {error}")
+        return []
+
 def fetch_game_plays(year: int = 2026, week: int = 1, team: str = None):
     """
     Fetches play-by-play telemetry for a specific team, week, and season.

@@ -3,16 +3,29 @@ import json
 import cfbd
 from dotenv import load_dotenv
 
-# Load environment variables
+# Load environment variables from local .env if present
 load_dotenv()
 
-RAW_KEY = os.getenv("CFBD_API_KEY")
-OUTPUT_DIR = os.getenv("OUTPUT_DIR", "./data")
+def get_secret(key: str, default=None):
+    """Checks OS environment variables first, then falls back to Streamlit Cloud secrets."""
+    val = os.getenv(key)
+    if val:
+        return val
+    try:
+        import streamlit as st
+        if key in st.secrets:
+            return st.secrets[key]
+    except Exception:
+        pass
+    return default
+
+OUTPUT_DIR = get_secret("OUTPUT_DIR", "./data")
 
 def get_api_configuration():
-    if not RAW_KEY:
-        raise ValueError("CFBD_API_KEY is missing from environment variables. Check your .env file.")
-    return cfbd.Configuration(access_token=RAW_KEY)
+    api_key = get_secret("CFBD_API_KEY")
+    if not api_key:
+        raise ValueError("CFBD_API_KEY is missing. Add it to your local .env file or Streamlit Cloud Secrets.")
+    return cfbd.Configuration(access_token=api_key)
 
 def get_games_api():
     return cfbd.GamesApi(cfbd.ApiClient(get_api_configuration()))
@@ -30,14 +43,15 @@ def fetch_and_cache_games(year: int = 2025, classification: str = 'fbs', season_
 
     try:
         games_api = get_games_api()
+        output_dir = get_secret("OUTPUT_DIR", "./data")
         
         print("Connecting to secure data server gateway...")
         games_data = games_api.get_games(year=year, season_type=season_type, classification=classification)
         
         raw_json_list = [game.to_dict() for game in games_data]
         
-        os.makedirs(OUTPUT_DIR, exist_ok=True)
-        output_filename = os.path.join(OUTPUT_DIR, f"records_{year}.json")
+        os.makedirs(output_dir, exist_ok=True)
+        output_filename = os.path.join(output_dir, f"records_{year}.json")
         
         with open(output_filename, "w", encoding="utf-8") as f:
             json.dump(raw_json_list, f, default=str, indent=4)
@@ -48,7 +62,7 @@ def fetch_and_cache_games(year: int = 2025, classification: str = 'fbs', season_
 
     except Exception as error:
         print(f"❌ PIPELINE CONNECTION REJECTED: {error}")
-        print("Action Required: Check your .env file to ensure the API key is active.")
+        print("Action Required: Check your .env file or Streamlit Secrets to ensure the API key is active.")
         raise error
 
     finally:
@@ -61,10 +75,11 @@ def fetch_game_team_stats(year: int = 2025, team: str = None):
     """
     try:
         games_api = get_games_api()
-        os.makedirs(OUTPUT_DIR, exist_ok=True)
+        output_dir = get_secret("OUTPUT_DIR", "./data")
+        os.makedirs(output_dir, exist_ok=True)
 
         clean_team = team.lower().replace(' ', '_') if team else "all"
-        output_filename = os.path.join(OUTPUT_DIR, f"box_stats_{clean_team}_{year}.json")
+        output_filename = os.path.join(output_dir, f"box_stats_{clean_team}_{year}.json")
 
         if os.path.exists(output_filename):
             with open(output_filename, "r", encoding="utf-8") as f:
@@ -95,10 +110,11 @@ def fetch_game_plays(year: int = 2025, week: int = 1, team: str = None):
     """
     try:
         plays_api = get_plays_api()
-        os.makedirs(OUTPUT_DIR, exist_ok=True)
+        output_dir = get_secret("OUTPUT_DIR", "./data")
+        os.makedirs(output_dir, exist_ok=True)
 
         clean_team = team.lower().replace(' ', '_') if team else "all"
-        output_filename = os.path.join(OUTPUT_DIR, f"plays_{clean_team}_wk{week}_{year}.json")
+        output_filename = os.path.join(output_dir, f"plays_{clean_team}_wk{week}_{year}.json")
 
         if os.path.exists(output_filename):
             with open(output_filename, "r", encoding="utf-8") as f:

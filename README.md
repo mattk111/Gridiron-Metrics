@@ -29,7 +29,6 @@ Automatically calculates down-by-down run/pass ratios so coaches can instantly s
 
 ## 🛠️ How the Data Flows
 
-```text
 [Get Live Game Data] -> [Save Raw Files] -> [Run Math Filters] -> [Print Stats Report]
 ```
 
@@ -43,9 +42,20 @@ When you run the tool, it instantly reads the game data, runs the math, and prin
 Initializing GridironMetrics-CFB Analytics Engine...
 
 --- Pipeline Transformation Matrix ---
+<<<<<<< HEAD
 Successfully loaded 6 raw play rows into DataFrame.
+=======
+<<<<<<< HEAD
+Successfully loaded 4 raw play rows into DataFrame.
+
+=======
+Successfully loaded 6 raw play rows into DataFrame.
+>>>>>>> 86299fa (Update README.md)
+>>>>>>> 9cad283e2b6cc29e4c94efa04bd025f1a05059bd
 Raw Success Rate:             50.0%
+
 Talent-Adjusted Success Index: 31.2
+
 Total Explosive Plays Created: 1
 
 --- Coaching Tendency Breakdown ---
@@ -53,10 +63,28 @@ Total Explosive Plays Created: 1
 3rd Down Play-Calling: Run: 0.0% (0) | Pass: 100.0% (1)
 
 --- Detailed Play Inspection Log ---
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+
+Play 1: Run | Dn: 1 | Dist: 10 | Yds Gained: 6 | Success: True | Explosive: False
+
+Play 2: Pass | Dn: 2 | Dist: 8 | Yds Gained: 3 | Success: False | Explosive: False
+
+Play 3: Pass | Dn: 3 | Dist: 4 | Yds Gained: 16 | Success: True | Explosive: True
+
+Play 4: Run | Dn: 4 | Dist: 2 | Yds Gained: 1 | Success: False | Explosive: False
+
+=======
+>>>>>>> 9cad283e2b6cc29e4c94efa04bd025f1a05059bd
 Play 1: Run | Down: 1 | Dist: 10 | Yds Gained: 6 | Success: True | Explosive: False
 Play 2: Run | Down: 1 | Dist: 10 | Yds Gained: 2 | Success: False | Explosive: False
 Play 3: Pass | Down: 1 | Dist: 10 | Yds Gained: 12 | Success: True | Explosive: False
 Play 4: Pass | Down: 2 | Dist: 8 | Yds Gained: 3 | Success: False | Explosive: False
 Play 5: Pass | Down: 3 | Dist: 4 | Yds Gained: 16 | Success: True | Explosive: True
 Play 6: Run | Down: 4 | Dist: 2 | Yds Gained: 1 | Success: False | Explosive: False
+<<<<<<< HEAD
+=======
+>>>>>>> 86299fa (Update README.md)
+>>>>>>> 9cad283e2b6cc29e4c94efa04bd025f1a05059bd
 ```

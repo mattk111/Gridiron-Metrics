@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import pandas as pd
 from dotenv import load_dotenv
 
@@ -9,17 +10,13 @@ OUTPUT_DIR = os.getenv("OUTPUT_DIR", "./data")
 DEFAULT_FILEPATH = os.path.join(OUTPUT_DIR, "records_2025.json")
 
 def load_raw_data(filepath: str = DEFAULT_FILEPATH) -> pd.DataFrame:
-    """Loads raw game records JSON into a pandas DataFrame."""
     if not os.path.exists(filepath):
         raise FileNotFoundError(f"Missing live data file at: {filepath}. Run ingest.py first!")
-        
     with open(filepath, 'r', encoding='utf-8') as f:
         data = json.load(f)
-    
     return pd.DataFrame(data)
 
 def get_teams_by_conference(df: pd.DataFrame, conference: str) -> list:
-    """Extracts a sorted list of unique team names belonging to a specific conference."""
     cols = df.columns.tolist()
     home_conf_key = next((c for c in cols if 'conference' in c.lower() and 'home' in c.lower()), None)
     away_conf_key = next((c for c in cols if 'conference' in c.lower() and 'away' in c.lower()), None)
@@ -36,23 +33,16 @@ def get_teams_by_conference(df: pd.DataFrame, conference: str) -> list:
     return sorted(list(teams))
 
 def get_team_schedule(df: pd.DataFrame, team_name: str) -> pd.DataFrame:
-    """Filters season records to isolate a selected team's full schedule."""
     cols = df.columns.tolist()
     home_team_key = next((c for c in cols if 'home_team' in c.lower() or 'hometeam' in c.lower()), 'home_team')
     away_team_key = next((c for c in cols if 'away_team' in c.lower() or 'awayteam' in c.lower()), 'away_team')
 
     schedule_df = df[(df[home_team_key] == team_name) | (df[away_team_key] == team_name)].copy()
-    
     if 'week' in schedule_df.columns:
         schedule_df = schedule_df.sort_values(by='week')
-        
     return schedule_df
 
 def parse_game_box_stats(game_id: int, team_name: str, year: int = 2025) -> dict:
-    """
-    Queries cached team statistics and parses side-by-side metrics for a targeted game.
-    Flexibly maps camelCase or snake_case keys from CFBD responses.
-    """
     from ingest import fetch_game_team_stats
     box_records = fetch_game_team_stats(year=year, team=team_name)
     
@@ -74,13 +64,19 @@ def parse_game_box_stats(game_id: int, team_name: str, year: int = 2025) -> dict
             category = stat.get('category')
             value = stat.get('stat')
             stat_dict[category] = value
-            
             clean_cat = str(category).lower().replace(' ', '').replace('_', '')
             stat_dict[clean_cat] = value
-
         parsed_stats[t_name] = stat_dict
 
     return parsed_stats
+
+def _normalize_player_name(name: str) -> str:
+    """Strips suffixes (Jr., Sr., II, III, IV) and punctuation for reliable name matching."""
+    s = str(name or "").lower().strip()
+    s = re.sub(r"[.,']", "", s)
+    s = re.sub(r"\b(jr|sr|ii|iii|iv|v)\b", "", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
 
 def _build_roster_position_lookup(year: int, team_name: str) -> tuple[dict, dict]:
     """
@@ -95,15 +91,19 @@ def _build_roster_position_lookup(year: int, team_name: str) -> tuple[dict, dict
         pos = str(p.get('position') or '').strip().upper()
         if not pos:
             continue
+
         p_id = p.get('id')
         if p_id is not None:
-            id_map[str(p_id)] = pos
+            id_map[str(p_id).strip()] = pos
 
         first = str(p.get('first_name') or p.get('firstName') or '').strip()
         last = str(p.get('last_name') or p.get('lastName') or '').strip()
-        full_name = f"{first} {last}".strip().lower()
-        if full_name:
-            name_map[full_name] = pos
+        combined = f"{first} {last}".strip()
+        raw_name = str(p.get('name') or p.get('full_name') or combined).strip()
+
+        norm_name = _normalize_player_name(raw_name)
+        if norm_name:
+            name_map[norm_name] = pos
 
     return id_map, name_map
 
@@ -126,6 +126,7 @@ def parse_game_player_leaders(game_id: int, team_name: str, year: int = 2025) ->
         return {}
 
     target_categories = ['passing', 'rushing', 'receiving']
+    default_pos_by_cat = {'passing': 'QB', 'rushing': 'RB', 'receiving': 'WR'}
     leaders_by_team = {}
 
     for team_entry in selected_game.get('teams', []):
@@ -138,7 +139,6 @@ def parse_game_player_leaders(game_id: int, team_name: str, year: int = 2025) ->
             if cat_name not in target_categories:
                 continue
 
-            # Build per-player stat map for this category (e.g. YDS, TD, INT, CAR, REC, C/ATT)
             player_stats_map = {}
             for type_entry in cat_entry.get('types', []):
                 stat_type = str(type_entry.get('name', '')).upper()
@@ -150,7 +150,6 @@ def parse_game_player_leaders(game_id: int, team_name: str, year: int = 2025) ->
                         player_stats_map[p_name] = {"_id": p_id}
                     player_stats_map[p_name][stat_type] = stat_val
 
-            # Identify the player with the highest YDS in this category
             best_player = None
             best_yards = float('-inf')
             best_raw_stats = {}
@@ -167,9 +166,14 @@ def parse_game_player_leaders(game_id: int, team_name: str, year: int = 2025) ->
                     best_raw_stats = stats_dict
 
             if best_player is not None:
-                # Look up roster position via athlete ID first, then normalized name
-                p_id_str = str(best_raw_stats.get("_id")) if best_raw_stats.get("_id") is not None else ""
-                pos = id_map.get(p_id_str) or name_map.get(best_player.strip().lower(), "")
+                p_id_str = str(best_raw_stats.get("_id")).strip() if best_raw_stats.get("_id") is not None else ""
+                norm_player = _normalize_player_name(best_player)
+
+                pos = (
+                    id_map.get(p_id_str)
+                    or name_map.get(norm_player)
+                    or default_pos_by_cat.get(cat_name, "")
+                )
                 player_display = f"{pos} {best_player}".strip() if pos else best_player
 
                 yds_int = int(best_yards) if best_yards.is_integer() else best_yards
@@ -196,9 +200,6 @@ def parse_game_player_leaders(game_id: int, team_name: str, year: int = 2025) ->
     return leaders_by_team
 
 def get_game_plays_df(game_id: int, week: int, team_name: str, year: int = 2025) -> pd.DataFrame:
-    """
-    Fetches play-by-play records for a specific team/week and isolates the exact game_id.
-    """
     from ingest import fetch_game_plays
     plays_records = fetch_game_plays(year=year, week=week, team=team_name)
     if not plays_records:
@@ -216,7 +217,6 @@ def get_game_plays_df(game_id: int, week: int, team_name: str, year: int = 2025)
     return df_plays
 
 def calculate_coaching_metrics(df: pd.DataFrame) -> pd.DataFrame:
-    """Calculates game-level coaching metrics and logs analysis breakdown."""
     processed_df = df.copy()
     cols = processed_df.columns.tolist()
     
@@ -231,10 +231,3 @@ def calculate_coaching_metrics(df: pd.DataFrame) -> pd.DataFrame:
     processed_df['margin'] = (processed_df['home_pts'] - processed_df['away_pts']).abs()
     
     return processed_df
-
-if __name__ == "__main__":
-    try:
-        live_df = load_raw_data()
-        calculate_coaching_metrics(live_df)
-    except Exception as e:
-        print(f"Pipeline Execution Error: {e}")

@@ -10,6 +10,7 @@ from analytics import (
     parse_game_player_leaders,
     get_game_plays_df
 )
+from season_recap import render_season_recap
 
 # --- ENVIRONMENT CONFIGURATION ---
 load_dotenv()
@@ -382,7 +383,7 @@ st.sidebar.divider()
 
 app_mode = st.sidebar.radio(
     "Select Analytics ViewProfile:", 
-    ["Single Game Inspector", "Game Analysis Engine", "Play Scouting Engine"]
+    ["Single Game Inspector", "Game Analysis Engine", "Play Scouting Engine", "Season Recap"]
 )
 
 # =====================================================================
@@ -605,7 +606,7 @@ elif app_mode == "Game Analysis Engine":
 # =====================================================================
 # VIEW PANEL 3: PLAY SCOUTING ENGINE (2020-2026 SEASONS)
 # =====================================================================
-else:
+elif app_mode == "Play Scouting Engine":
     st.title(f"🏈 {selected_season} Down & Distance Play Scouting Engine")
     st.markdown(f"Drill down through **Conference ➔ Team ➔ Schedule** to evaluate situational play-by-play telemetry across any **{selected_season}** matchup.")
     
@@ -681,3 +682,9 @@ else:
                     st.dataframe(styled_grid, width="stretch", hide_index=True)
                 else:
                     st.warning("No tracking data available for the chosen filter criteria.")
+
+# =====================================================================
+# VIEW PANEL 4: SEASON RECAP (2020-2026 SEASONS)
+# =====================================================================
+else:
+    render_season_recap(selected_season)

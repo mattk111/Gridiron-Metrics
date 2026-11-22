@@ -79,9 +79,7 @@ def _normalize_player_name(name: str) -> str:
     return s
 
 def _build_roster_position_lookup(year: int, team_name: str) -> tuple[dict, dict]:
-    """
-    Builds (id_to_pos, normalized_name_to_pos) maps from cached team roster data.
-    """
+    """Builds (id_to_pos, normalized_name_to_pos) maps from cached team roster data."""
     from ingest import fetch_team_roster
     roster = fetch_team_roster(year=year, team=team_name)
     id_map = {}

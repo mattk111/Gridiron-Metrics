@@ -209,11 +209,29 @@ def fetch_season_records_df(year: int) -> pd.DataFrame:
             "Conference": team_data["Conference"],
             "Wins": w,
             "Losses": l,
-            "Record": f"{w}-{l}",
+            "Record": f"{w}–{l}",
             "Win %": round(win_pct, 3),
         })
 
     return pd.DataFrame(rows)
+
+
+def _format_champion_with_record(champ_entry: str, record_lookup: dict) -> str:
+    """Appends each team's season record next to its name (handles '&' co-champions too)."""
+    if not champ_entry or champ_entry.startswith("TBD") or not record_lookup:
+        return champ_entry
+
+    if " & " in champ_entry:
+        parts = [p.strip() for p in champ_entry.split("&")]
+        formatted_parts = [
+            f"{p} ({record_lookup[p]})" if p in record_lookup else p
+            for p in parts
+        ]
+        return " & ".join(formatted_parts)
+
+    if champ_entry in record_lookup:
+        return f"{champ_entry} ({record_lookup[champ_entry]})"
+    return champ_entry
 
 
 def _render_champ_card(label: str, team_text: str, badge_text: str = None):
@@ -261,6 +279,7 @@ def render_season_recap(selected_year: int):
     st.divider()
 
     # --- BEST & WORST RECORD TEAMS ---
+    record_lookup = {}
     with st.spinner(f"Calculating {selected_year} FBS team records..."):
         try:
             df_records = fetch_season_records_df(selected_year)
@@ -269,6 +288,7 @@ def render_season_recap(selected_year: int):
             df_records = pd.DataFrame()
 
     if not df_records.empty:
+        record_lookup = dict(zip(df_records["Team"], df_records["Record"]))
         active_df = df_records[(df_records["Wins"] + df_records["Losses"]) > 0].copy()
         if not active_df.empty:
             best_df = active_df.sort_values(by=["Win %", "Wins"], ascending=[False, False])
@@ -293,11 +313,18 @@ def render_season_recap(selected_year: int):
 
     st.divider()
 
-    # --- CONFERENCE CHAMPIONS ---
+    # --- CONFERENCE CHAMPIONS (WITH RECORDS) ---
     st.subheader("🏅 Conference Champions")
     conf_champs = meta.get("conference_champions", {})
     if conf_champs:
-        conf_df = pd.DataFrame(list(conf_champs.items()), columns=["Conference", "Champion"])
+        formatted_rows = [
+            {
+                "Conference": conf,
+                "Champion": _format_champion_with_record(champ, record_lookup),
+            }
+            for conf, champ in conf_champs.items()
+        ]
+        conf_df = pd.DataFrame(formatted_rows)
         st.dataframe(conf_df, width="stretch", hide_index=True)
     else:
         st.info(f"Conference championship data not yet configured for {selected_year}.")

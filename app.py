@@ -19,8 +19,13 @@ OUTPUT_DIR = os.getenv("OUTPUT_DIR", "./data")
 st.set_page_config(page_title="GridironMetrics CFB Dashboard", page_icon="🏈", layout="wide")
 
 # --- CONSOLIDATED BACKEND DATA LOADERS ---
+# In app.py — replace load_game_data() with this:
+@st.cache_data(ttl=86400)
 def load_game_data():
     filepath = os.path.join(OUTPUT_DIR, 'records_2025.json')
+    if not os.path.exists(filepath):
+        from ingest import fetch_and_cache_games
+        fetch_and_cache_games(year=2025)
     if os.path.exists(filepath):
         with open(filepath, 'r', encoding='utf-8') as f:
             return pd.DataFrame(json.load(f))

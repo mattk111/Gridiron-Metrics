@@ -4,15 +4,15 @@ import pandas as pd
 import streamlit as st
 from ingest import get_secret, fetch_and_cache_games
 
-AWARD_ORDER = [
-    "Heisman Trophy",
-    "Davey O'Brien Award",
-    "Doak Walker Award",
-    "Fred Biletnikoff Award",
-    "John Mackey Award",
-    "Dick Butkus Award",
-    "Jim Thorpe Award",
-    "Lou Groza Award",
+AWARD_INFO = [
+    ("Heisman Trophy", "(Most Outstanding Player)"),
+    ("Davey O'Brien Award", "(Best Quarterback)"),
+    ("Doak Walker Award", "(Best Running Back)"),
+    ("Fred Biletnikoff Award", "(Best Wide Receiver)"),
+    ("John Mackey Award", "(Best Tight End)"),
+    ("Dick Butkus Award", "(Best Linebacker)"),
+    ("Jim Thorpe Award", "(Best Defensive Back)"),
+    ("Lou Groza Award", "(Best Kicker)"),
 ]
 
 CHAMPIONSHIP_DATA = {
@@ -609,6 +609,43 @@ def _render_champ_card(label: str, team_text: str, badge_text: str = None):
     )
 
 
+def _render_awards_table(awards_dict: dict):
+    """Renders a styled 2-column Award | Recipient table with each award's purpose on a second line."""
+    rows_html = []
+    for award_name, award_desc in AWARD_INFO:
+        recipient = awards_dict.get(award_name, "N/A")
+        rows_html.append(
+            f"""
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.08);">
+                <td style="padding: 9px 12px; vertical-align: middle; line-height: 1.3;">
+                    <div style="font-weight: 600; font-size: 0.9rem; color: #f3f4f6;">{award_name}</div>
+                    <div style="font-size: 0.78rem; color: #9ca3af;">{award_desc}</div>
+                </td>
+                <td style="padding: 9px 12px; vertical-align: middle; font-size: 0.9rem; color: #e5e7eb;">
+                    {recipient}
+                </td>
+            </tr>
+            """
+        )
+
+    table_html = f"""
+    <div style="border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; overflow: hidden;">
+        <table style="width: 100%; border-collapse: collapse; background-color: rgba(255,255,255,0.02);">
+            <thead>
+                <tr style="background-color: rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.12); text-align: left;">
+                    <th style="padding: 10px 12px; font-size: 0.82rem; font-weight: 600; color: #9ca3af;">Award</th>
+                    <th style="padding: 10px 12px; font-size: 0.82rem; font-weight: 600; color: #9ca3af;">Recipient</th>
+                </tr>
+            </thead>
+            <tbody>
+                {''.join(rows_html)}
+            </tbody>
+        </table>
+    </div>
+    """
+    st.markdown(table_html, unsafe_allow_html=True)
+
+
 def render_season_recap(selected_year: int):
     st.title(f"🏆 {selected_year} CFB Season Recap")
     st.markdown(f"Championship results, top and bottom FBS records, conference champions, and major award winners for the **{selected_year}** season.")
@@ -690,14 +727,6 @@ def render_season_recap(selected_year: int):
         st.subheader("🎖️ Award Winners")
         awards_dict = meta.get("awards", {})
         if awards_dict:
-            award_rows = [
-                {
-                    "Award": award_name,
-                    "Recipient": awards_dict.get(award_name, "N/A"),
-                }
-                for award_name in AWARD_ORDER
-            ]
-            awards_df = pd.DataFrame(award_rows)
-            st.dataframe(awards_df, width="stretch", hide_index=True)
+            _render_awards_table(awards_dict)
         else:
             st.info(f"Award winner data not yet configured for {selected_year}.")

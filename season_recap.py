@@ -615,34 +615,30 @@ def _render_awards_table(awards_dict: dict):
     for award_name, award_desc in AWARD_INFO:
         recipient = awards_dict.get(award_name, "N/A")
         rows_html.append(
-            f"""
-            <tr style="border-bottom: 1px solid rgba(255,255,255,0.08);">
-                <td style="padding: 9px 12px; vertical-align: middle; line-height: 1.3;">
-                    <div style="font-weight: 600; font-size: 0.9rem; color: #f3f4f6;">{award_name}</div>
-                    <div style="font-size: 0.78rem; color: #9ca3af;">{award_desc}</div>
-                </td>
-                <td style="padding: 9px 12px; vertical-align: middle; font-size: 0.9rem; color: #e5e7eb;">
-                    {recipient}
-                </td>
-            </tr>
-            """
+            f'<tr style="border-bottom: 1px solid rgba(255,255,255,0.08);">'
+            f'<td style="padding: 9px 12px; vertical-align: middle; line-height: 1.3;">'
+            f'<div style="font-weight: 600; font-size: 0.9rem; color: #f3f4f6;">{award_name}</div>'
+            f'<div style="font-size: 0.78rem; color: #9ca3af;">{award_desc}</div>'
+            f'</td>'
+            f'<td style="padding: 9px 12px; vertical-align: middle; font-size: 0.9rem; color: #e5e7eb;">'
+            f'{recipient}'
+            f'</td>'
+            f'</tr>'
         )
 
-    table_html = f"""
-    <div style="border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; overflow: hidden;">
-        <table style="width: 100%; border-collapse: collapse; background-color: rgba(255,255,255,0.02);">
-            <thead>
-                <tr style="background-color: rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.12); text-align: left;">
-                    <th style="padding: 10px 12px; font-size: 0.82rem; font-weight: 600; color: #9ca3af;">Award</th>
-                    <th style="padding: 10px 12px; font-size: 0.82rem; font-weight: 600; color: #9ca3af;">Recipient</th>
-                </tr>
-            </thead>
-            <tbody>
-                {''.join(rows_html)}
-            </tbody>
-        </table>
-    </div>
-    """
+    table_html = (
+        '<div style="border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; overflow: hidden;">'
+        '<table style="width: 100%; border-collapse: collapse; background-color: rgba(255,255,255,0.02);">'
+        '<thead>'
+        '<tr style="background-color: rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.12); text-align: left;">'
+        '<th style="padding: 10px 12px; font-size: 0.82rem; font-weight: 600; color: #9ca3af;">Award</th>'
+        '<th style="padding: 10px 12px; font-size: 0.82rem; font-weight: 600; color: #9ca3af;">Recipient</th>'
+        '</tr>'
+        '</thead>'
+        f'<tbody>{"".join(rows_html)}</tbody>'
+        '</table>'
+        '</div>'
+    )
     st.markdown(table_html, unsafe_allow_html=True)
 
 

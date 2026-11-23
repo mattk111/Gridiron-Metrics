@@ -15,7 +15,7 @@ from season_recap import render_season_recap
 # --- ENVIRONMENT CONFIGURATION ---
 load_dotenv()
 OUTPUT_DIR = os.getenv("OUTPUT_DIR", "./data")
-AVAILABLE_SEASONS = [2026, 2025, 2024, 2023, 2022, 2021, 2020]
+AVAILABLE_SEASONS = list(range(2026, 2009, -1))  # 2026 down to 2010
 
 # --- PAGE INITIALIZATION LAYOUT ---
 st.set_page_config(page_title="GridironMetrics CFB Dashboard", page_icon="🏈", layout="wide")

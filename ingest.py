@@ -156,5 +156,5 @@ def fetch_game_plays(year: int = 2026, week: int = 1, team: str = None):
         return []
 
 if __name__ == "__main__":
-    for yr in range(2020, 2027):
+    for yr in range(2010, 2027):
         fetch_and_cache_games(year=yr)

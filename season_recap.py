@@ -4,6 +4,17 @@ import pandas as pd
 import streamlit as st
 from ingest import get_secret, fetch_and_cache_games
 
+AWARD_ORDER = [
+    "Heisman Trophy",
+    "Davey O'Brien Award",
+    "Doak Walker Award",
+    "Fred Biletnikoff Award",
+    "John Mackey Award",
+    "Dick Butkus Award",
+    "Jim Thorpe Award",
+    "Lou Groza Award",
+]
+
 CHAMPIONSHIP_DATA = {
     2026: {
         "national_champion": "TBD (Season in Progress)",
@@ -21,6 +32,16 @@ CHAMPIONSHIP_DATA = {
             "CUSA": "TBD",
             "Pac-12": "TBD",
         },
+        "awards": {
+            "Heisman Trophy": "TBD (Dec 2026)",
+            "Davey O'Brien Award": "TBD (Dec 2026)",
+            "Doak Walker Award": "TBD (Dec 2026)",
+            "Fred Biletnikoff Award": "TBD (Dec 2026)",
+            "John Mackey Award": "TBD (Dec 2026)",
+            "Dick Butkus Award": "TBD (Dec 2026)",
+            "Jim Thorpe Award": "TBD (Dec 2026)",
+            "Lou Groza Award": "TBD (Dec 2026)",
+        },
     },
     2025: {
         "national_champion": "Indiana Hoosiers (16–0)",
@@ -37,6 +58,16 @@ CHAMPIONSHIP_DATA = {
             "MAC": "Western Michigan",
             "CUSA": "Kennesaw State",
         },
+        "awards": {
+            "Heisman Trophy": "Fernando Mendoza, Indiana",
+            "Davey O'Brien Award": "Fernando Mendoza, Indiana",
+            "Doak Walker Award": "Jeremiyah Love, Notre Dame",
+            "Fred Biletnikoff Award": "Makai Lemon, USC",
+            "John Mackey Award": "Eli Stowers, Vanderbilt",
+            "Dick Butkus Award": "Jacob Rodriguez, Texas Tech",
+            "Jim Thorpe Award": "Caleb Downs, Ohio State",
+            "Lou Groza Award": "Tate Sandell, Oklahoma",
+        },
     },
     2024: {
         "national_champion": "Ohio State Buckeyes (14–2)",
@@ -52,6 +83,16 @@ CHAMPIONSHIP_DATA = {
             "Sun Belt": "Marshall",
             "MAC": "Ohio",
             "CUSA": "Jacksonville State",
+        },
+        "awards": {
+            "Heisman Trophy": "Travis Hunter, Colorado",
+            "Davey O'Brien Award": "Cam Ward, Miami",
+            "Doak Walker Award": "Ashton Jeanty, Boise State",
+            "Fred Biletnikoff Award": "Travis Hunter, Colorado",
+            "John Mackey Award": "Tyler Warren, Penn State",
+            "Dick Butkus Award": "Jalon Walker, Georgia",
+            "Jim Thorpe Award": "Jahdae Barron, Texas",
+            "Lou Groza Award": "Kenneth Almendares, Louisiana",
         },
     },
     2023: {
@@ -70,6 +111,16 @@ CHAMPIONSHIP_DATA = {
             "MAC": "Miami (OH)",
             "CUSA": "Liberty",
         },
+        "awards": {
+            "Heisman Trophy": "Jayden Daniels, LSU",
+            "Davey O'Brien Award": "Jayden Daniels, LSU",
+            "Doak Walker Award": "Ollie Gordon II, Oklahoma State",
+            "Fred Biletnikoff Award": "Marvin Harrison Jr., Ohio State",
+            "John Mackey Award": "Brock Bowers, Georgia",
+            "Dick Butkus Award": "Payton Wilson, NC State",
+            "Jim Thorpe Award": "Trey Taylor, Air Force",
+            "Lou Groza Award": "Graham Nicholson, Miami (OH)",
+        },
     },
     2022: {
         "national_champion": "Georgia Bulldogs (15–0)",
@@ -86,6 +137,16 @@ CHAMPIONSHIP_DATA = {
             "Sun Belt": "Troy",
             "MAC": "Toledo",
             "CUSA": "UTSA",
+        },
+        "awards": {
+            "Heisman Trophy": "Caleb Williams, USC",
+            "Davey O'Brien Award": "Max Duggan, TCU",
+            "Doak Walker Award": "Bijan Robinson, Texas",
+            "Fred Biletnikoff Award": "Jalin Hyatt, Tennessee",
+            "John Mackey Award": "Brock Bowers, Georgia",
+            "Dick Butkus Award": "Jack Campbell, Iowa",
+            "Jim Thorpe Award": "Tre'Vius Hodges-Tomlinson, TCU",
+            "Lou Groza Award": "Christopher Dunn, NC State",
         },
     },
     2021: {
@@ -104,6 +165,16 @@ CHAMPIONSHIP_DATA = {
             "MAC": "Northern Illinois",
             "CUSA": "UTSA",
         },
+        "awards": {
+            "Heisman Trophy": "Bryce Young, Alabama",
+            "Davey O'Brien Award": "Bryce Young, Alabama",
+            "Doak Walker Award": "Kenneth Walker III, Michigan State",
+            "Fred Biletnikoff Award": "Jordan Addison, Pittsburgh",
+            "John Mackey Award": "Trey McBride, Colorado State",
+            "Dick Butkus Award": "Nakobe Dean, Georgia",
+            "Jim Thorpe Award": "Coby Bryant, Cincinnati",
+            "Lou Groza Award": "Jake Moody, Michigan",
+        },
     },
     2020: {
         "national_champion": "Alabama Crimson Tide (13–0)",
@@ -120,6 +191,16 @@ CHAMPIONSHIP_DATA = {
             "Sun Belt": "Coastal Carolina & Louisiana",
             "MAC": "Ball State",
             "CUSA": "UAB",
+        },
+        "awards": {
+            "Heisman Trophy": "DeVonta Smith, Alabama",
+            "Davey O'Brien Award": "Mac Jones, Alabama",
+            "Doak Walker Award": "Najee Harris, Alabama",
+            "Fred Biletnikoff Award": "DeVonta Smith, Alabama",
+            "John Mackey Award": "Kyle Pitts, Florida",
+            "Dick Butkus Award": "Jeremiah Owusu-Koramoah, Notre Dame",
+            "Jim Thorpe Award": "Trevon Moehrig, TCU",
+            "Lou Groza Award": "Jose Borregales, Miami",
         },
     },
     2019: {
@@ -138,6 +219,16 @@ CHAMPIONSHIP_DATA = {
             "MAC": "Miami (OH)",
             "CUSA": "Florida Atlantic",
         },
+        "awards": {
+            "Heisman Trophy": "Joe Burrow, LSU",
+            "Davey O'Brien Award": "Joe Burrow, LSU",
+            "Doak Walker Award": "Jonathan Taylor, Wisconsin",
+            "Fred Biletnikoff Award": "Ja'Marr Chase, LSU",
+            "John Mackey Award": "Harrison Bryant, Florida Atlantic",
+            "Dick Butkus Award": "Isaiah Simmons, Clemson",
+            "Jim Thorpe Award": "Grant Delpit, LSU",
+            "Lou Groza Award": "Rodrigo Blankenship, Georgia",
+        },
     },
     2018: {
         "national_champion": "Clemson Tigers (15–0)",
@@ -154,6 +245,16 @@ CHAMPIONSHIP_DATA = {
             "Sun Belt": "Appalachian State",
             "MAC": "Northern Illinois",
             "CUSA": "UAB",
+        },
+        "awards": {
+            "Heisman Trophy": "Kyler Murray, Oklahoma",
+            "Davey O'Brien Award": "Kyler Murray, Oklahoma",
+            "Doak Walker Award": "Jonathan Taylor, Wisconsin",
+            "Fred Biletnikoff Award": "Jerry Jeudy, Alabama",
+            "John Mackey Award": "T.J. Hockenson, Iowa",
+            "Dick Butkus Award": "Devin White, LSU",
+            "Jim Thorpe Award": "Deandre Baker, Georgia",
+            "Lou Groza Award": "Andre Szmyt, Syracuse",
         },
     },
     2017: {
@@ -172,6 +273,16 @@ CHAMPIONSHIP_DATA = {
             "MAC": "Toledo",
             "CUSA": "Florida Atlantic",
         },
+        "awards": {
+            "Heisman Trophy": "Baker Mayfield, Oklahoma",
+            "Davey O'Brien Award": "Baker Mayfield, Oklahoma",
+            "Doak Walker Award": "Bryce Love, Stanford",
+            "Fred Biletnikoff Award": "James Washington, Oklahoma State",
+            "John Mackey Award": "Mark Andrews, Oklahoma",
+            "Dick Butkus Award": "Roquan Smith, Georgia",
+            "Jim Thorpe Award": "Minkah Fitzpatrick, Alabama",
+            "Lou Groza Award": "Matt Gay, Utah",
+        },
     },
     2016: {
         "national_champion": "Clemson Tigers (14–1)",
@@ -188,6 +299,16 @@ CHAMPIONSHIP_DATA = {
             "Sun Belt": "Appalachian State & Arkansas State",
             "MAC": "Western Michigan",
             "CUSA": "Western Kentucky",
+        },
+        "awards": {
+            "Heisman Trophy": "Lamar Jackson, Louisville",
+            "Davey O'Brien Award": "Deshaun Watson, Clemson",
+            "Doak Walker Award": "D'Onta Foreman, Texas",
+            "Fred Biletnikoff Award": "Dede Westbrook, Oklahoma",
+            "John Mackey Award": "Jake Butt, Michigan",
+            "Dick Butkus Award": "Reuben Foster, Alabama",
+            "Jim Thorpe Award": "Adoree' Jackson, USC",
+            "Lou Groza Award": "Zane Gonzalez, Arizona State",
         },
     },
     2015: {
@@ -206,6 +327,16 @@ CHAMPIONSHIP_DATA = {
             "MAC": "Bowling Green",
             "CUSA": "Western Kentucky",
         },
+        "awards": {
+            "Heisman Trophy": "Derrick Henry, Alabama",
+            "Davey O'Brien Award": "Deshaun Watson, Clemson",
+            "Doak Walker Award": "Derrick Henry, Alabama",
+            "Fred Biletnikoff Award": "Corey Coleman, Baylor",
+            "John Mackey Award": "Hunter Henry, Arkansas",
+            "Dick Butkus Award": "Jaylon Smith, Notre Dame",
+            "Jim Thorpe Award": "Desmond King, Iowa",
+            "Lou Groza Award": "Ka'imi Fairbairn, UCLA",
+        },
     },
     2014: {
         "national_champion": "Ohio State Buckeyes (14–1)",
@@ -223,6 +354,16 @@ CHAMPIONSHIP_DATA = {
             "MAC": "Northern Illinois",
             "CUSA": "Marshall",
         },
+        "awards": {
+            "Heisman Trophy": "Marcus Mariota, Oregon",
+            "Davey O'Brien Award": "Marcus Mariota, Oregon",
+            "Doak Walker Award": "Melvin Gordon, Wisconsin",
+            "Fred Biletnikoff Award": "Amari Cooper, Alabama",
+            "John Mackey Award": "Nick O'Leary, Florida State",
+            "Dick Butkus Award": "Eric Kendricks, UCLA",
+            "Jim Thorpe Award": "Gerod Holliman, Louisville",
+            "Lou Groza Award": "Brad Craddock, Maryland",
+        },
     },
     2013: {
         "national_champion": "Florida State Seminoles (14–0)",
@@ -239,6 +380,16 @@ CHAMPIONSHIP_DATA = {
             "Sun Belt": "Arkansas State & Louisiana",
             "MAC": "Bowling Green",
             "CUSA": "Rice",
+        },
+        "awards": {
+            "Heisman Trophy": "Jameis Winston, Florida State",
+            "Davey O'Brien Award": "Jameis Winston, Florida State",
+            "Doak Walker Award": "Andre Williams, Boston College",
+            "Fred Biletnikoff Award": "Brandin Cooks, Oregon State",
+            "John Mackey Award": "Austin Seferian-Jenkins, Washington",
+            "Dick Butkus Award": "C.J. Mosley, Alabama",
+            "Jim Thorpe Award": "Darqueze Dennard, Michigan State",
+            "Lou Groza Award": "Roberto Aguayo, Florida State",
         },
     },
     2012: {
@@ -258,6 +409,16 @@ CHAMPIONSHIP_DATA = {
             "CUSA": "Tulsa",
             "WAC": "Utah State",
         },
+        "awards": {
+            "Heisman Trophy": "Johnny Manziel, Texas A&M",
+            "Davey O'Brien Award": "Johnny Manziel, Texas A&M",
+            "Doak Walker Award": "Montee Ball, Wisconsin",
+            "Fred Biletnikoff Award": "Marqise Lee, USC",
+            "John Mackey Award": "Tyler Eifert, Notre Dame",
+            "Dick Butkus Award": "Manti Te'o, Notre Dame",
+            "Jim Thorpe Award": "Johnthan Banks, Mississippi State",
+            "Lou Groza Award": "Cairo Santos, Tulane",
+        },
     },
     2011: {
         "national_champion": "Alabama Crimson Tide (12–1)",
@@ -276,6 +437,16 @@ CHAMPIONSHIP_DATA = {
             "CUSA": "Southern Miss",
             "WAC": "Louisiana Tech",
         },
+        "awards": {
+            "Heisman Trophy": "Robert Griffin III, Baylor",
+            "Davey O'Brien Award": "Robert Griffin III, Baylor",
+            "Doak Walker Award": "Trent Richardson, Alabama",
+            "Fred Biletnikoff Award": "Justin Blackmon, Oklahoma State",
+            "John Mackey Award": "Dwayne Allen, Clemson",
+            "Dick Butkus Award": "Luke Kuechly, Boston College",
+            "Jim Thorpe Award": "Morris Claiborne, LSU",
+            "Lou Groza Award": "Randy Bullock, Texas A&M",
+        },
     },
     2010: {
         "national_champion": "Auburn Tigers (14–0)",
@@ -293,6 +464,16 @@ CHAMPIONSHIP_DATA = {
             "MAC": "Miami (OH)",
             "CUSA": "UCF",
             "WAC": "Boise State & Hawaii & Nevada",
+        },
+        "awards": {
+            "Heisman Trophy": "Cam Newton, Auburn",
+            "Davey O'Brien Award": "Cam Newton, Auburn",
+            "Doak Walker Award": "LaMichael James, Oregon",
+            "Fred Biletnikoff Award": "Justin Blackmon, Oklahoma State",
+            "John Mackey Award": "D.J. Williams, Arkansas",
+            "Dick Butkus Award": "Von Miller, Texas A&M",
+            "Jim Thorpe Award": "Patrick Peterson, LSU",
+            "Lou Groza Award": "Dan Bailey, Oklahoma State",
         },
     },
 }
@@ -430,7 +611,7 @@ def _render_champ_card(label: str, team_text: str, badge_text: str = None):
 
 def render_season_recap(selected_year: int):
     st.title(f"🏆 {selected_year} CFB Season Recap")
-    st.markdown(f"Championship results, top and bottom FBS records, and conference title winners for the **{selected_year}** season.")
+    st.markdown(f"Championship results, top and bottom FBS records, conference champions, and major award winners for the **{selected_year}** season.")
 
     meta = CHAMPIONSHIP_DATA.get(selected_year, {})
 
@@ -486,18 +667,37 @@ def render_season_recap(selected_year: int):
 
     st.divider()
 
-    # --- CONFERENCE CHAMPIONS (WITH RECORDS) ---
-    st.subheader("🏅 Conference Champions")
-    conf_champs = meta.get("conference_champions", {})
-    if conf_champs:
-        formatted_rows = [
-            {
-                "Conference": conf,
-                "Champion": _format_champion_with_record(champ, record_lookup),
-            }
-            for conf, champ in conf_champs.items()
-        ]
-        conf_df = pd.DataFrame(formatted_rows)
-        st.dataframe(conf_df, width="stretch", hide_index=True)
-    else:
-        st.info(f"Conference championship data not yet configured for {selected_year}.")
+    # --- CONFERENCE CHAMPIONS & AWARD WINNERS SIDE BY SIDE ---
+    left_col, right_col = st.columns(2)
+
+    with left_col:
+        st.subheader("🏅 Conference Champions")
+        conf_champs = meta.get("conference_champions", {})
+        if conf_champs:
+            formatted_rows = [
+                {
+                    "Conference": conf,
+                    "Champion": _format_champion_with_record(champ, record_lookup),
+                }
+                for conf, champ in conf_champs.items()
+            ]
+            conf_df = pd.DataFrame(formatted_rows)
+            st.dataframe(conf_df, width="stretch", hide_index=True)
+        else:
+            st.info(f"Conference championship data not yet configured for {selected_year}.")
+
+    with right_col:
+        st.subheader("🎖️ Award Winners")
+        awards_dict = meta.get("awards", {})
+        if awards_dict:
+            award_rows = [
+                {
+                    "Award": award_name,
+                    "Recipient": awards_dict.get(award_name, "N/A"),
+                }
+                for award_name in AWARD_ORDER
+            ]
+            awards_df = pd.DataFrame(award_rows)
+            st.dataframe(awards_df, width="stretch", hide_index=True)
+        else:
+            st.info(f"Award winner data not yet configured for {selected_year}.")

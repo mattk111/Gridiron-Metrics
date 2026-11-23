@@ -12,7 +12,7 @@ AWARD_INFO = [
     ("John Mackey Award", "(Best Tight End)"),
     ("Dick Butkus Award", "(Best Linebacker)"),
     ("Jim Thorpe Award", "(Best Defensive Back)"),
-    ("Lou Groza Award", "(Best Kicker)"),
+    ("Lou Groza Award", "(Best Placekicker)"),
 ]
 
 CHAMPIONSHIP_DATA = {
@@ -20,6 +20,8 @@ CHAMPIONSHIP_DATA = {
         "national_champion": "TBD (Season in Progress)",
         "runner_up": "TBD (Season in Progress)",
         "title_score": "—",
+        "off_mvp": "TBD",
+        "def_mvp": "TBD",
         "conference_champions": {
             "SEC": "TBD",
             "Big Ten": "TBD",
@@ -47,6 +49,8 @@ CHAMPIONSHIP_DATA = {
         "national_champion": "Indiana Hoosiers (16–0)",
         "runner_up": "Miami Hurricanes (13–2)",
         "title_score": "27–21",
+        "off_mvp": "Fernando Mendoza (QB)",
+        "def_mvp": "Mikail Kamara (DE)",
         "conference_champions": {
             "Big Ten": "Indiana",
             "SEC": "Georgia",
@@ -73,6 +77,8 @@ CHAMPIONSHIP_DATA = {
         "national_champion": "Ohio State Buckeyes (14–2)",
         "runner_up": "Notre Dame Fighting Irish (14–2)",
         "title_score": "34–23",
+        "off_mvp": "Will Howard (QB)",
+        "def_mvp": "Cody Simon (LB)",
         "conference_champions": {
             "Big Ten": "Oregon",
             "SEC": "Georgia",
@@ -99,6 +105,8 @@ CHAMPIONSHIP_DATA = {
         "national_champion": "Michigan Wolverines (15–0)",
         "runner_up": "Washington Huskies (14–1)",
         "title_score": "34–13",
+        "off_mvp": "Blake Corum (RB)",
+        "def_mvp": "Will Johnson (CB)",
         "conference_champions": {
             "Big Ten": "Michigan",
             "SEC": "Alabama",
@@ -126,6 +134,8 @@ CHAMPIONSHIP_DATA = {
         "national_champion": "Georgia Bulldogs (15–0)",
         "runner_up": "TCU Horned Frogs (13–2)",
         "title_score": "65–7",
+        "off_mvp": "Stetson Bennett (QB)",
+        "def_mvp": "Javon Bullard (DB)",
         "conference_champions": {
             "SEC": "Georgia",
             "Big Ten": "Michigan",
@@ -153,6 +163,8 @@ CHAMPIONSHIP_DATA = {
         "national_champion": "Georgia Bulldogs (14–1)",
         "runner_up": "Alabama Crimson Tide (13–2)",
         "title_score": "33–18",
+        "off_mvp": "Stetson Bennett (QB)",
+        "def_mvp": "Lewis Cine (S)",
         "conference_champions": {
             "SEC": "Alabama",
             "Big Ten": "Michigan",
@@ -180,6 +192,8 @@ CHAMPIONSHIP_DATA = {
         "national_champion": "Alabama Crimson Tide (13–0)",
         "runner_up": "Ohio State Buckeyes (7–1)",
         "title_score": "52–24",
+        "off_mvp": "DeVonta Smith (WR)",
+        "def_mvp": "Christian Barmore (DT)",
         "conference_champions": {
             "SEC": "Alabama",
             "Big Ten": "Ohio State",
@@ -207,6 +221,8 @@ CHAMPIONSHIP_DATA = {
         "national_champion": "LSU Tigers (15–0)",
         "runner_up": "Clemson Tigers (14–1)",
         "title_score": "42–25",
+        "off_mvp": "Joe Burrow (QB)",
+        "def_mvp": "Patrick Queen (LB)",
         "conference_champions": {
             "SEC": "LSU",
             "Big Ten": "Ohio State",
@@ -234,6 +250,8 @@ CHAMPIONSHIP_DATA = {
         "national_champion": "Clemson Tigers (15–0)",
         "runner_up": "Alabama Crimson Tide (14–1)",
         "title_score": "44–16",
+        "off_mvp": "Trevor Lawrence (QB)",
+        "def_mvp": "Trayvon Mullen (CB)",
         "conference_champions": {
             "ACC": "Clemson",
             "SEC": "Alabama",
@@ -261,6 +279,8 @@ CHAMPIONSHIP_DATA = {
         "national_champion": "Alabama Crimson Tide (13–1)",
         "runner_up": "Georgia Bulldogs (13–2)",
         "title_score": "26–23 (OT)",
+        "off_mvp": "Tua Tagovailoa (QB)",
+        "def_mvp": "Da'Ron Payne (DT)",
         "conference_champions": {
             "SEC": "Georgia",
             "Big Ten": "Ohio State",
@@ -288,6 +308,8 @@ CHAMPIONSHIP_DATA = {
         "national_champion": "Clemson Tigers (14–1)",
         "runner_up": "Alabama Crimson Tide (14–1)",
         "title_score": "35–31",
+        "off_mvp": "Deshaun Watson (QB)",
+        "def_mvp": "Ben Boulware (LB)",
         "conference_champions": {
             "ACC": "Clemson",
             "SEC": "Alabama",
@@ -315,6 +337,8 @@ CHAMPIONSHIP_DATA = {
         "national_champion": "Alabama Crimson Tide (14–1)",
         "runner_up": "Clemson Tigers (14–1)",
         "title_score": "45–40",
+        "off_mvp": "O.J. Howard (TE)",
+        "def_mvp": "Eddie Jackson (S)",
         "conference_champions": {
             "SEC": "Alabama",
             "ACC": "Clemson",
@@ -342,6 +366,8 @@ CHAMPIONSHIP_DATA = {
         "national_champion": "Ohio State Buckeyes (14–1)",
         "runner_up": "Oregon Ducks (13–2)",
         "title_score": "42–20",
+        "off_mvp": "Ezekiel Elliott (RB)",
+        "def_mvp": "Tyvis Powell (S)",
         "conference_champions": {
             "Big Ten": "Ohio State",
             "Pac-12": "Oregon",
@@ -369,6 +395,8 @@ CHAMPIONSHIP_DATA = {
         "national_champion": "Florida State Seminoles (14–0)",
         "runner_up": "Auburn Tigers (12–2)",
         "title_score": "34–31 (BCS)",
+        "off_mvp": "Jameis Winston (QB)",
+        "def_mvp": "P.J. Williams (CB)",
         "conference_champions": {
             "ACC": "Florida State",
             "SEC": "Auburn",
@@ -396,6 +424,8 @@ CHAMPIONSHIP_DATA = {
         "national_champion": "Alabama Crimson Tide (13–1)",
         "runner_up": "Notre Dame Fighting Irish (12–1)",
         "title_score": "42–14 (BCS)",
+        "off_mvp": "Eddie Lacy (RB)",
+        "def_mvp": "C.J. Mosley (LB)",
         "conference_champions": {
             "SEC": "Alabama",
             "Big Ten": "Wisconsin",
@@ -424,6 +454,8 @@ CHAMPIONSHIP_DATA = {
         "national_champion": "Alabama Crimson Tide (12–1)",
         "runner_up": "LSU Tigers (13–1)",
         "title_score": "21–0 (BCS)",
+        "off_mvp": "AJ McCarron (QB)",
+        "def_mvp": "Courtney Upshaw (LB)",
         "conference_champions": {
             "SEC": "LSU",
             "Big Ten": "Wisconsin",
@@ -452,6 +484,8 @@ CHAMPIONSHIP_DATA = {
         "national_champion": "Auburn Tigers (14–0)",
         "runner_up": "Oregon Ducks (12–1)",
         "title_score": "22–19 (BCS)",
+        "off_mvp": "Michael Dyer (RB)",
+        "def_mvp": "Nick Fairley (DT)",
         "conference_champions": {
             "SEC": "Auburn",
             "Pac-10": "Oregon",
@@ -588,25 +622,35 @@ def _format_champion_with_record(champ_entry: str, record_lookup: dict) -> str:
     return champ_entry
 
 
-def _render_champ_card(label: str, team_text: str, badge_text: str = None):
-    """Renders a compact championship card with small, clean typography that fits at 100% zoom."""
+def _render_champ_card(label: str, team_text: str, badge_text: str = None, off_mvp: str = None, def_mvp: str = None):
+    """Renders a compact championship card with title score and Offensive/Defensive MVPs."""
     badge_html = (
-        f"<div style='margin-top:5px;'>"
-        f"<span style='display:inline-block; padding:2px 8px; border-radius:999px; "
-        f"background-color:rgba(16, 185, 129, 0.2); color:#6ee7b7; font-size:0.75rem; font-weight:600;'>"
-        f"{badge_text}</span></div>"
+        f'<div style="margin-top:5px;">'
+        f'<span style="display:inline-block; padding:2px 8px; border-radius:999px; '
+        f'background-color:rgba(16, 185, 129, 0.2); color:#6ee7b7; font-size:0.75rem; font-weight:600;">'
+        f'{badge_text}</span></div>'
         if badge_text else ""
     )
-    st.markdown(
-        f"""
-        <div style="padding: 10px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12); background-color: rgba(255,255,255,0.03);">
-            <div style="font-size: 0.78rem; color: #9ca3af; margin-bottom: 3px;">{label}</div>
-            <div style="font-size: 0.98rem; font-weight: 700; line-height: 1.25;">{team_text}</div>
-            {badge_html}
-        </div>
-        """,
-        unsafe_allow_html=True,
+
+    mvp_html = ""
+    if off_mvp or def_mvp:
+        mvp_html = (
+            '<div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08); '
+            'font-size:0.78rem; color:#d1d5db; line-height:1.4;">'
+            f'<div><span style="color:#9ca3af;">Offensive MVP:</span> <strong>{off_mvp or "N/A"}</strong></div>'
+            f'<div><span style="color:#9ca3af;">Defensive MVP:</span> <strong>{def_mvp or "N/A"}</strong></div>'
+            '</div>'
+        )
+
+    card_html = (
+        '<div style="padding: 10px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12); background-color: rgba(255,255,255,0.03);">'
+        f'<div style="font-size: 0.78rem; color: #9ca3af; margin-bottom: 3px;">{label}</div>'
+        f'<div style="font-size: 0.98rem; font-weight: 700; line-height: 1.25;">{team_text}</div>'
+        f'{badge_html}'
+        f'{mvp_html}'
+        '</div>'
     )
+    st.markdown(card_html, unsafe_allow_html=True)
 
 
 def _render_awards_table(awards_dict: dict):
@@ -615,15 +659,15 @@ def _render_awards_table(awards_dict: dict):
     for award_name, award_desc in AWARD_INFO:
         recipient = awards_dict.get(award_name, "N/A")
         rows_html.append(
-            f'<tr style="border-bottom: 1px solid rgba(255,255,255,0.08);">'
-            f'<td style="padding: 9px 12px; vertical-align: middle; line-height: 1.3;">'
+            '<tr style="border-bottom: 1px solid rgba(255,255,255,0.08);">'
+            '<td style="padding: 9px 12px; vertical-align: middle; line-height: 1.3;">'
             f'<div style="font-weight: 600; font-size: 0.9rem; color: #f3f4f6;">{award_name}</div>'
             f'<div style="font-size: 0.78rem; color: #9ca3af;">{award_desc}</div>'
-            f'</td>'
-            f'<td style="padding: 9px 12px; vertical-align: middle; font-size: 0.9rem; color: #e5e7eb;">'
+            '</td>'
+            '<td style="padding: 9px 12px; vertical-align: middle; font-size: 0.9rem; color: #e5e7eb;">'
             f'{recipient}'
-            f'</td>'
-            f'</tr>'
+            '</td>'
+            '</tr>'
         )
 
     table_html = (
@@ -656,6 +700,8 @@ def render_season_recap(selected_year: int):
             label="🥇 National Champion",
             team_text=meta.get("national_champion", "N/A"),
             badge_text=f"Title Game: {score}" if score and score != "—" else None,
+            off_mvp=meta.get("off_mvp"),
+            def_mvp=meta.get("def_mvp"),
         )
     with col2:
         _render_champ_card(

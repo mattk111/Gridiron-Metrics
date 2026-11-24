@@ -108,6 +108,11 @@ def format_nfl_round(game_type: str, week: int) -> str:
     return labels.get(gt, f"Week {week}")
 
 
+def _safe_int(val, default=0) -> int:
+    num = pd.to_numeric(val, errors="coerce")
+    return int(num) if pd.notna(num) else default
+
+
 def parse_nfl_box_stats(game_id: str, week: int, away_abbr: str, home_abbr: str, year: int) -> dict:
     """Extracts official team box score stats for Away & Home teams in a given NFL game."""
     df_team = fetch_nfl_team_stats(year=year)
@@ -128,23 +133,21 @@ def parse_nfl_box_stats(game_id: str, week: int, away_abbr: str, home_abbr: str,
             continue
         r = t_rows.iloc[0]
 
-        pass_yds = int(pd.to_numeric(r.get("passing_yards", 0), errors="coerce") or 0)
-        rush_yds = int(pd.to_numeric(r.get("rushing_yards", 0), errors="coerce") or 0)
+        pass_yds = _safe_int(r.get("passing_yards", 0))
+        rush_yds = _safe_int(r.get("rushing_yards", 0))
         total_yds = pass_yds + rush_yds
 
-        pass_fd = int(pd.to_numeric(r.get("passing_first_downs", 0), errors="coerce") or 0)
-        rush_fd = int(pd.to_numeric(r.get("rushing_first_downs", 0), errors="coerce") or 0)
-        pen_fd = int(pd.to_numeric(r.get("penalty_first_downs", 0), errors="coerce") or 0)
+        pass_fd = _safe_int(r.get("passing_first_downs", 0))
+        rush_fd = _safe_int(r.get("rushing_first_downs", 0))
+        pen_fd = _safe_int(r.get("penalty_first_downs", 0))
         first_downs = pass_fd + rush_fd + pen_fd
 
-        ints = int(pd.to_numeric(r.get("passing_interceptions", 0), errors="coerce") or 0)
-        fumbles = int(pd.to_numeric(r.get("rushing_fumbles_lost", 0), errors="coerce") or 0) + int(
-            pd.to_numeric(r.get("receiving_fumbles_lost", 0), errors="coerce") or 0
-        )
+        ints = _safe_int(r.get("passing_interceptions", 0))
+        fumbles = _safe_int(r.get("rushing_fumbles_lost", 0)) + _safe_int(r.get("receiving_fumbles_lost", 0))
         turnovers = ints + fumbles
 
-        comp = int(pd.to_numeric(r.get("completions", 0), errors="coerce") or 0)
-        att = int(pd.to_numeric(r.get("attempts", 0), errors="coerce") or 0)
+        comp = _safe_int(r.get("completions", 0))
+        att = _safe_int(r.get("attempts", 0))
 
         td_conv = pd.to_numeric(r.get("third_down_converted", None), errors="coerce")
         td_att = pd.to_numeric(r.get("third_down_failed", None), errors="coerce")
@@ -191,11 +194,11 @@ def parse_nfl_player_leaders(week: int, away_abbr: str, home_abbr: str, year: in
                 top = p_df.sort_values("yds_num", ascending=False).iloc[0]
                 pos = str(top.get("position") or "QB").strip()
                 name = str(top.get("player_display_name") or top.get("player_name") or "Unknown")
-                comp = int(pd.to_numeric(top.get("completions", 0), errors="coerce") or 0)
-                att = int(pd.to_numeric(top.get("attempts", 0), errors="coerce") or 0)
+                comp = _safe_int(top.get("completions", 0))
+                att = _safe_int(top.get("attempts", 0))
                 yds = int(top["yds_num"])
-                tds = int(pd.to_numeric(top.get("passing_tds", 0), errors="coerce") or 0)
-                ints = int(pd.to_numeric(top.get("passing_interceptions", 0), errors="coerce") or 0)
+                tds = _safe_int(top.get("passing_tds", 0))
+                ints = _safe_int(top.get("passing_interceptions", 0))
                 leaders_by_team[target_abbr]["passing"] = {
                     "player": f"{pos} {name}",
                     "yards": float(yds),
@@ -210,9 +213,9 @@ def parse_nfl_player_leaders(week: int, away_abbr: str, home_abbr: str, year: in
                 top = r_df.sort_values("yds_num", ascending=False).iloc[0]
                 pos = str(top.get("position") or "RB").strip()
                 name = str(top.get("player_display_name") or top.get("player_name") or "Unknown")
-                car = int(pd.to_numeric(top.get("carries", 0), errors="coerce") or 0)
+                car = _safe_int(top.get("carries", 0))
                 yds = int(top["yds_num"])
-                tds = int(pd.to_numeric(top.get("rushing_tds", 0), errors="coerce") or 0)
+                tds = _safe_int(top.get("rushing_tds", 0))
                 leaders_by_team[target_abbr]["rushing"] = {
                     "player": f"{pos} {name}",
                     "yards": float(yds),
@@ -227,9 +230,9 @@ def parse_nfl_player_leaders(week: int, away_abbr: str, home_abbr: str, year: in
                 top = rec_df.sort_values("yds_num", ascending=False).iloc[0]
                 pos = str(top.get("position") or "WR").strip()
                 name = str(top.get("player_display_name") or top.get("player_name") or "Unknown")
-                rec = int(pd.to_numeric(top.get("receptions", 0), errors="coerce") or 0)
+                rec = _safe_int(top.get("receptions", 0))
                 yds = int(top["yds_num"])
-                tds = int(pd.to_numeric(top.get("receiving_tds", 0), errors="coerce") or 0)
+                tds = _safe_int(top.get("receiving_tds", 0))
                 leaders_by_team[target_abbr]["receiving"] = {
                     "player": f"{pos} {name}",
                     "yards": float(yds),
@@ -262,6 +265,8 @@ def build_nfl_plays_grid(
 
     def _fmt_qtr(q):
         try:
+            if pd.isna(q):
+                return "N/A"
             qi = int(float(q))
             return qi if qi <= 4 else f"OT{qi - 4}"
         except (ValueError, TypeError):
@@ -280,11 +285,11 @@ def build_nfl_plays_grid(
     df["Score"] = df.apply(_fmt_score, axis=1)
 
     def _classify_nfl_impact(r):
-        is_td = int(pd.to_numeric(r.get("touchdown", 0), errors="coerce") or 0) == 1
-        fg_res = str(r.get("field_goal_result", "")).lower()
+        is_td = _safe_int(r.get("touchdown", 0)) == 1
+        fg_res = str(r.get("field_goal_result") or "").lower()
         is_fg = fg_res == "made"
-        is_int = int(pd.to_numeric(r.get("interception", 0), errors="coerce") or 0) == 1
-        is_fum = int(pd.to_numeric(r.get("fumble_lost", 0), errors="coerce") or 0) == 1
+        is_int = _safe_int(r.get("interception", 0)) == 1
+        is_fum = _safe_int(r.get("fumble_lost", 0)) == 1
         is_to = is_int or is_fum
 
         if is_to and is_td:

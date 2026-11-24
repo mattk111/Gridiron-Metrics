@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 
 # --- CFB MODULES ---
 from analytics import (
+    get_available_conferences,
     get_teams_by_conference,
     get_team_schedule,
     parse_game_box_stats,
@@ -42,6 +43,7 @@ st.set_page_config(page_title="GridironMetrics Dashboard", page_icon="🏈", lay
 def load_game_data(year: int):
     """Loads CFB schedule data for any season (2010-2026), auto-fetching from CFBD if not cached."""
     from ingest import fetch_and_cache_games, _normalize_record
+
     filepath = os.path.join(OUTPUT_DIR, f"records_{year}.json")
     records = []
     if os.path.exists(filepath):
@@ -195,7 +197,6 @@ def format_running_score(row, offense_key, off_score_key, def_score_key, away_te
 def render_hierarchy_selector(df_games, selected_year: int, key_prefix="nav"):
     """CFB 3-column Conference -> Team -> Game hierarchy selector."""
     cols = df_games.columns.tolist()
-    home_conf_key = next((c for c in cols if "conference" in c.lower() and "home" in c.lower()), None)
     home_team_key = next((c for c in cols if "home_team" in c.lower() or "hometeam" in c.lower()), "home_team")
     away_team_key = next((c for c in cols if "away_team" in c.lower() or "awayteam" in c.lower()), "away_team")
     home_pts_key = next((c for c in cols if "home_points" in c.lower() or "homepoints" in c.lower()), "home_points")
@@ -212,12 +213,14 @@ def render_hierarchy_selector(df_games, selected_year: int, key_prefix="nav"):
     col_conf, col_team, col_game = st.columns(3)
 
     with col_conf:
-        if home_conf_key:
-            conf_list = sorted(df_games[home_conf_key].dropna().unique().tolist())
-            default_idx = conf_list.index("SEC") if "SEC" in conf_list else 0
-            selected_conf = st.selectbox("1️⃣ Select Conference:", conf_list, index=default_idx, key=f"{key_prefix}_{selected_year}_conf")
-        else:
-            selected_conf = "SEC"
+        conf_list = get_available_conferences(df_games)
+        default_idx = conf_list.index("SEC") if "SEC" in conf_list else 0
+        selected_conf = st.selectbox(
+            "1️⃣ Select Conference:",
+            conf_list,
+            index=default_idx,
+            key=f"{key_prefix}_{selected_year}_conf",
+        )
 
     teams_in_conf = get_teams_by_conference(df_games, selected_conf)
     with col_team:
@@ -250,7 +253,11 @@ def render_hierarchy_selector(df_games, selected_year: int, key_prefix="nav"):
 
     with col_game:
         if game_options:
-            selected_game_label = st.selectbox("3️⃣ Select Game from Schedule:", list(game_options.keys()), key=f"{key_prefix}_{selected_year}_game")
+            selected_game_label = st.selectbox(
+                "3️⃣ Select Game from Schedule:",
+                list(game_options.keys()),
+                key=f"{key_prefix}_{selected_year}_game",
+            )
             return selected_team, *game_options[selected_game_label]
         else:
             st.warning("No games found for this team.")
@@ -264,7 +271,12 @@ def render_nfl_hierarchy_selector(df_sched, selected_year: int, key_prefix="nfl_
 
     div_options = ["All NFL", "AFC", "NFC"] + list(NFL_DIVISIONS.keys())
     with col_div:
-        selected_div = st.selectbox("1️⃣ Select Conference / Division:", div_options, index=0, key=f"{key_prefix}_{selected_year}_div")
+        selected_div = st.selectbox(
+            "1️⃣ Select Conference / Division:",
+            div_options,
+            index=0,
+            key=f"{key_prefix}_{selected_year}_div",
+        )
 
     team_codes = get_nfl_teams_by_division(selected_div)
     with col_team:
@@ -295,7 +307,11 @@ def render_nfl_hierarchy_selector(df_sched, selected_year: int, key_prefix="nfl_
 
     with col_game:
         if game_options:
-            selected_label = st.selectbox("3️⃣ Select Game from Schedule:", list(game_options.keys()), key=f"{key_prefix}_{selected_year}_game")
+            selected_label = st.selectbox(
+                "3️⃣ Select Game from Schedule:",
+                list(game_options.keys()),
+                key=f"{key_prefix}_{selected_year}_game",
+            )
             return selected_team, *game_options[selected_label]
         else:
             st.warning("No NFL games found for this team.")
@@ -309,8 +325,12 @@ def classify_impact_play(row, p_type_key, text_key, scoring_key):
 
     turnover_keywords = ["interception", "intercepted", "fumble recovery", "fumbles, recovered", "turnover on downs"]
     is_turnover = any(k in p_type or k in p_text for k in turnover_keywords)
-    is_td = "touchdown" in p_type or "touchdown" in p_text or (is_scoring and "field goal" not in p_type and "safety" not in p_type)
-    is_fg = ("field goal good" in p_type) or (is_scoring and "field goal" in p_type) or ("field goal" in p_text and "is good" in p_text)
+    is_td = "touchdown" in p_type or "touchdown" in p_text or (
+        is_scoring and "field goal" not in p_type and "safety" not in p_type
+    )
+    is_fg = ("field goal good" in p_type) or (is_scoring and "field goal" in p_type) or (
+        "field goal" in p_text and "is good" in p_text
+    )
 
     if is_turnover and is_td:
         return "🚨🏆 DEF/ST TD"
@@ -334,7 +354,15 @@ def style_impact_rows(row):
     return [""] * len(row)
 
 
-def build_plays_grid(df_plays, limit_plays=None, offense_filter="All Offenses", down_filter="All Downs", impact_filter="All Plays", away_team="", home_team=""):
+def build_plays_grid(
+    df_plays,
+    limit_plays=None,
+    offense_filter="All Offenses",
+    down_filter="All Downs",
+    impact_filter="All Plays",
+    away_team="",
+    home_team="",
+):
     play_cols = df_plays.columns.tolist()
     offense_key = next((c for c in play_cols if c.lower() in ["offense", "offense_team", "offenseteam"]), None)
     p_type_key = next((c for c in play_cols if "play_type" in c.lower() or "playtype" in c.lower()), "play_type")
@@ -441,8 +469,14 @@ def build_plays_grid(df_plays, limit_plays=None, offense_filter="All Offenses", 
     display_plays["Success Status"] = display_plays["is_success"].apply(lambda x: "Yes" if x else "No")
     display_plays["Explosive Play"] = display_plays["is_explosive"].apply(lambda x: "Yes" if x else "No")
 
-    display_cols = ["Quarter", "Time", "Score", "Impact Play", "play_category", "clean_down", "clean_dist", "clean_yds", "Success Status", "Explosive Play", text_key]
-    col_names = ["Quarter", "Time", "Score", "Impact Play", "Play Category", "Down", "Distance", "Yards Gained", "Success Status", "Explosive Play", "Play Description"]
+    display_cols = [
+        "Quarter", "Time", "Score", "Impact Play", "play_category",
+        "clean_down", "clean_dist", "clean_yds", "Success Status", "Explosive Play", text_key,
+    ]
+    col_names = [
+        "Quarter", "Time", "Score", "Impact Play", "Play Category",
+        "Down", "Distance", "Yards Gained", "Success Status", "Explosive Play", "Play Description",
+    ]
 
     if offense_key:
         display_cols.insert(3, offense_key)
@@ -486,7 +520,9 @@ if selected_league == "College Football (CFB)":
 
     if app_mode == "Single Game Inspector":
         st.title(f"🔍 {selected_season} CFB Single Game Box Score Inspector")
-        st.markdown(f"Drill down through **Conference ➔ Team ➔ Schedule** to view full **{selected_season}** match statistics, statistical leaders, and timestamped plays.")
+        st.markdown(
+            f"Drill down through **Conference ➔ Team ➔ Schedule** to view full **{selected_season}** match statistics, statistical leaders, and timestamped plays."
+        )
 
         with st.spinner(f"Loading {selected_season} season schedule..."):
             df_games = load_game_data(selected_season)
@@ -494,8 +530,8 @@ if selected_league == "College Football (CFB)":
         if df_games.empty:
             st.error(f"Could not load game records for the {selected_season} season.")
         else:
-            selected_team, selected_game_id, selected_week, home_team, away_team, home_score, away_score, is_completed = render_hierarchy_selector(
-                df_games, selected_year=selected_season, key_prefix="box"
+            selected_team, selected_game_id, selected_week, home_team, away_team, home_score, away_score, is_completed = (
+                render_hierarchy_selector(df_games, selected_year=selected_season, key_prefix="box")
             )
 
             st.divider()
@@ -511,10 +547,14 @@ if selected_league == "College Football (CFB)":
                 st.info(f"📅 This {selected_season} matchup ({away_team} @ {home_team}) has not been played yet.")
             else:
                 st.subheader("📊 Official Team Box Score Telemetry")
-                st.caption("🟩 **Green Highlight** indicates the statistical advantage in that category (lower is better for Turnovers).")
+                st.caption(
+                    "🟩 **Green Highlight** indicates the statistical advantage in that category (lower is better for Turnovers)."
+                )
 
                 with st.spinner(f"Fetching box score metrics for {selected_team} ({selected_season})..."):
-                    box_data = parse_game_box_stats(game_id=selected_game_id, team_name=selected_team, year=selected_season)
+                    box_data = parse_game_box_stats(
+                        game_id=selected_game_id, team_name=selected_team, year=selected_season
+                    )
 
                 if box_data:
                     metric_definitions = [
@@ -530,7 +570,11 @@ if selected_league == "College Football (CFB)":
                     home_dict = box_data.get(home_team, {})
 
                     table_rows = [
-                        {"Metric": label, away_team: extract_stat_value(away_dict, keys), home_team: extract_stat_value(home_dict, keys)}
+                        {
+                            "Metric": label,
+                            away_team: extract_stat_value(away_dict, keys),
+                            home_team: extract_stat_value(home_dict, keys),
+                        }
                         for label, keys in metric_definitions
                     ]
                     comparison_df = pd.DataFrame(table_rows)
@@ -544,10 +588,14 @@ if selected_league == "College Football (CFB)":
 
                 st.divider()
                 st.subheader("🌟 Individual Statistical Leaders")
-                st.caption("Top yardage performer per team in Passing, Rushing, and Receiving (🟩 highlights the higher yardage total).")
+                st.caption(
+                    "Top yardage performer per team in Passing, Rushing, and Receiving (🟩 highlights the higher yardage total)."
+                )
 
                 with st.spinner(f"Loading individual player leaders for {away_team} @ {home_team}..."):
-                    leaders_data = parse_game_player_leaders(game_id=selected_game_id, team_name=selected_team, year=selected_season)
+                    leaders_data = parse_game_player_leaders(
+                        game_id=selected_game_id, team_name=selected_team, year=selected_season
+                    )
 
                 if leaders_data:
                     away_leaders = leaders_data.get(away_team, {})
@@ -561,17 +609,22 @@ if selected_league == "College Football (CFB)":
                     for label, cat_key in leader_categories:
                         a_entry = away_leaders.get(cat_key)
                         h_entry = home_leaders.get(cat_key)
-                        leader_rows.append({
-                            "Category": label,
-                            away_team: a_entry["summary"] if a_entry else "N/A",
-                            home_team: h_entry["summary"] if h_entry else "N/A",
-                        })
+                        leader_rows.append(
+                            {
+                                "Category": label,
+                                away_team: a_entry["summary"] if a_entry else "N/A",
+                                home_team: h_entry["summary"] if h_entry else "N/A",
+                            }
+                        )
                         away_yards_list.append(a_entry["yards"] if a_entry else None)
                         home_yards_list.append(h_entry["yards"] if h_entry else None)
 
                     leaders_df = pd.DataFrame(leader_rows)
                     st.dataframe(
-                        leaders_df.style.apply(lambda r: style_leader_winner(r, away_team, home_team, away_yards_list, home_yards_list), axis=1),
+                        leaders_df.style.apply(
+                            lambda r: style_leader_winner(r, away_team, home_team, away_yards_list, home_yards_list),
+                            axis=1,
+                        ),
                         width="stretch",
                         hide_index=True,
                     )
@@ -581,21 +634,32 @@ if selected_league == "College Football (CFB)":
                 st.divider()
                 st.subheader("⏱️ Game Play-by-Play Log")
                 with st.spinner(f"Loading play-by-play log for {away_team} @ {home_team}..."):
-                    df_game_plays = get_game_plays_df(game_id=selected_game_id, week=selected_week, team_name=selected_team, year=selected_season)
+                    df_game_plays = get_game_plays_df(
+                        game_id=selected_game_id, week=selected_week, team_name=selected_team, year=selected_season
+                    )
 
                 if not df_game_plays.empty:
                     f_col1, f_col2 = st.columns(2)
                     with f_col1:
                         box_impact_filter = st.selectbox(
                             "Filter Plays:",
-                            ["All Plays", "Impact Plays Only (TDs, FGs, Turnovers)", "Scoring Plays Only", "Turnovers Only"],
+                            [
+                                "All Plays",
+                                "Impact Plays Only (TDs, FGs, Turnovers)",
+                                "Scoring Plays Only",
+                                "Turnovers Only",
+                            ],
                             key="box_play_filter",
                         )
                     with f_col2:
                         box_show_all = st.checkbox("Show All Plays (Max)", value=True, key="box_show_all")
-                        box_play_limit = st.slider("Plays to Display:", 10, 500, 500, 10, disabled=box_show_all, key="box_play_limit")
+                        box_play_limit = st.slider(
+                            "Plays to Display:", 10, 500, 500, 10, disabled=box_show_all, key="box_play_limit"
+                        )
 
-                    st.caption("🎨 **Row Highlight Legend:** 🟩 **Green** = Touchdown | 🟨 **Gold** = Field Goal | 🟥 **Red** = Turnover")
+                    st.caption(
+                        "🎨 **Row Highlight Legend:** 🟩 **Green** = Touchdown | 🟨 **Gold** = Field Goal | 🟥 **Red** = Turnover"
+                    )
                     plays_grid, box_metrics = build_plays_grid(
                         df_game_plays,
                         limit_plays=None if box_show_all else box_play_limit,
@@ -604,7 +668,9 @@ if selected_league == "College Football (CFB)":
                         home_team=home_team,
                     )
                     if not plays_grid.empty:
-                        st.caption(f"Showing **{len(plays_grid)}** of **{box_metrics['total']}** total plays (Chronological Order).")
+                        st.caption(
+                            f"Showing **{len(plays_grid)}** of **{box_metrics['total']}** total plays (Chronological Order)."
+                        )
                         st.dataframe(plays_grid.style.apply(style_impact_rows, axis=1), width="stretch", hide_index=True)
                     else:
                         st.info("No plays match the selected filter.")
@@ -640,13 +706,16 @@ if selected_league == "College Football (CFB)":
             st.subheader("🛠️ Strategy Filtering Panel")
             col1, col2 = st.columns(2)
             with col1:
-                if home_conf_key:
-                    conf_list = sorted(completed_games[home_conf_key].dropna().unique().tolist())
-                    default_idx = conf_list.index("SEC") if "SEC" in conf_list else 0
-                    selected_conf = st.selectbox("Select FBS Conference to Isolate:", conf_list, index=default_idx)
+                conf_list = get_available_conferences(completed_games)
+                default_idx = conf_list.index("SEC") if "SEC" in conf_list else 0
+                selected_conf = st.selectbox("Select FBS Conference to Isolate:", conf_list, index=default_idx)
+                if home_conf_key and completed_games[home_conf_key].dropna().nunique() > 0:
                     filtered_df = completed_games[completed_games[home_conf_key] == selected_conf]
                 else:
-                    filtered_df = completed_games
+                    conf_teams = set(get_teams_by_conference(completed_games, selected_conf))
+                    filtered_df = completed_games[
+                        completed_games[home_team_key].isin(conf_teams) | completed_games[away_team_key].isin(conf_teams)
+                    ]
             with col2:
                 display_limit = st.slider("Maximum Match Records to Output:", 5, 100, 25, 5)
 
@@ -663,15 +732,21 @@ if selected_league == "College Football (CFB)":
                 st.subheader(f"📋 Top {display_limit} Match Records Matrix")
                 report_df = filtered_df.head(display_limit).copy()
                 report_df["Explosive"] = report_df["total_points"].apply(lambda x: "Yes" if x >= 60 else "No")
-                display_df = report_df[[home_team_key, away_team_key, "home_pts", "away_pts", "total_points", "margin", "Explosive"]].copy()
-                display_df.columns = ["Home Team", "Away Team", "Home Points", "Away Points", "Total Points", "Scoring Margin", "Explosive"]
+                display_df = report_df[
+                    [home_team_key, away_team_key, "home_pts", "away_pts", "total_points", "margin", "Explosive"]
+                ].copy()
+                display_df.columns = [
+                    "Home Team", "Away Team", "Home Points", "Away Points", "Total Points", "Scoring Margin", "Explosive"
+                ]
                 st.dataframe(display_df, width="stretch", hide_index=True)
             else:
                 st.warning("Zero completed game records found under the selected filter.")
 
     elif app_mode == "Play Scouting Engine":
         st.title(f"🏈 {selected_season} CFB Down & Distance Play Scouting Engine")
-        st.markdown(f"Drill down through **Conference ➔ Team ➔ Schedule** to evaluate situational play-by-play telemetry across any **{selected_season}** matchup.")
+        st.markdown(
+            f"Drill down through **Conference ➔ Team ➔ Schedule** to evaluate situational play-by-play telemetry across any **{selected_season}** matchup."
+        )
 
         with st.spinner(f"Loading {selected_season} season schedule..."):
             df_games = load_game_data(selected_season)
@@ -679,15 +754,17 @@ if selected_league == "College Football (CFB)":
         if df_games.empty:
             st.error(f"Could not load game records for the {selected_season} season.")
         else:
-            selected_team, selected_game_id, selected_week, home_team, away_team, home_score, away_score, is_completed = render_hierarchy_selector(
-                df_games, selected_year=selected_season, key_prefix="plays"
+            selected_team, selected_game_id, selected_week, home_team, away_team, home_score, away_score, is_completed = (
+                render_hierarchy_selector(df_games, selected_year=selected_season, key_prefix="plays")
             )
             st.divider()
             if not is_completed:
                 st.info(f"📅 This {selected_season} matchup ({away_team} @ {home_team}) has not been played yet.")
             else:
                 with st.spinner(f"Loading play-by-play telemetry for {away_team} @ {home_team} ({selected_season})..."):
-                    df_plays = get_game_plays_df(game_id=selected_game_id, week=selected_week, team_name=selected_team, year=selected_season)
+                    df_plays = get_game_plays_df(
+                        game_id=selected_game_id, week=selected_week, team_name=selected_team, year=selected_season
+                    )
 
                 if df_plays.empty:
                     st.warning("No play-by-play data available for this matchup.")
@@ -697,9 +774,19 @@ if selected_league == "College Football (CFB)":
                     with col1:
                         selected_offense = st.selectbox("Offensive Unit:", ["All Offenses", away_team, home_team])
                     with col2:
-                        selected_down = st.selectbox("Down Profile:", ["All Downs", "1st Down", "2nd Down", "3rd Down", "4th Down"])
+                        selected_down = st.selectbox(
+                            "Down Profile:", ["All Downs", "1st Down", "2nd Down", "3rd Down", "4th Down"]
+                        )
                     with col3:
-                        impact_filter = st.selectbox("Impact Play Filter:", ["All Plays", "Impact Plays Only (TDs, FGs, Turnovers)", "Scoring Plays Only", "Turnovers Only"])
+                        impact_filter = st.selectbox(
+                            "Impact Play Filter:",
+                            [
+                                "All Plays",
+                                "Impact Plays Only (TDs, FGs, Turnovers)",
+                                "Scoring Plays Only",
+                                "Turnovers Only",
+                            ],
+                        )
                     with col4:
                         show_all_plays = st.checkbox("Show All Plays (Max)", value=True, key="scouting_show_all")
                         limit_plays = st.slider("Max Plays:", 10, 500, 500, 10, disabled=show_all_plays)
@@ -724,8 +811,14 @@ if selected_league == "College Football (CFB)":
                         p3.metric("Scoring Plays (TD / FG)", f"{metrics['td_count']} TDs | {metrics['fg_count']} FGs")
                         p4.metric("Turnovers Forced / Lost", f"{metrics['to_count']} Turnovers")
 
-                        st.caption("🎨 **Row Highlight Legend:** 🟩 **Green** = Touchdown | 🟨 **Gold** = Field Goal | 🟥 **Red** = Turnover")
-                        header_label = f"All {total_p_count} Plays" if show_all_plays else f"Top {len(final_web_grid)} of {total_p_count} Plays"
+                        st.caption(
+                            "🎨 **Row Highlight Legend:** 🟩 **Green** = Touchdown | 🟨 **Gold** = Field Goal | 🟥 **Red** = Turnover"
+                        )
+                        header_label = (
+                            f"All {total_p_count} Plays"
+                            if show_all_plays
+                            else f"Top {len(final_web_grid)} of {total_p_count} Plays"
+                        )
                         st.subheader(f"📋 Down-by-Down Inspection Log ({header_label} — Chronological)")
                         st.dataframe(final_web_grid.style.apply(style_impact_rows, axis=1), width="stretch", hide_index=True)
                     else:
@@ -742,7 +835,9 @@ else:
 
     if app_mode == "Single Game Inspector":
         st.title(f"🔍 {selected_season} NFL Single Game Box Score Inspector")
-        st.markdown(f"Drill down through **Division ➔ Team ➔ Schedule** to view full **{selected_season}** NFL box score metrics, positional leaders, and timestamped plays.")
+        st.markdown(
+            f"Drill down through **Division ➔ Team ➔ Schedule** to view full **{selected_season}** NFL box score metrics, positional leaders, and timestamped plays."
+        )
 
         with st.spinner(f"Loading {selected_season} NFL schedule..."):
             df_sched = load_nfl_schedule_data(selected_season)
@@ -750,28 +845,40 @@ else:
         if df_sched.empty:
             st.error(f"Could not load NFL schedule records for {selected_season}.")
         else:
-            selected_team, selected_game_id, selected_week, home_team, away_team, home_score, away_score, is_completed = render_nfl_hierarchy_selector(
-                df_sched, selected_year=selected_season, key_prefix="nfl_box"
+            selected_team, selected_game_id, selected_week, home_team, away_team, home_score, away_score, is_completed = (
+                render_nfl_hierarchy_selector(df_sched, selected_year=selected_season, key_prefix="nfl_box")
             )
 
             st.divider()
             sc1, sc2, sc3 = st.columns([2, 1, 2])
             with sc1:
-                st.metric(label=f"Away: {get_nfl_team_label(away_team)}", value=f"{away_score} Pts" if is_completed else "Scheduled")
+                st.metric(
+                    label=f"Away: {get_nfl_team_label(away_team)}",
+                    value=f"{away_score} Pts" if is_completed else "Scheduled",
+                )
             with sc2:
                 st.markdown("<h2 style='text-align: center; margin-top: 10px;'>VS</h2>", unsafe_allow_html=True)
             with sc3:
-                st.metric(label=f"Home: {get_nfl_team_label(home_team)}", value=f"{home_score} Pts" if is_completed else "Scheduled")
+                st.metric(
+                    label=f"Home: {get_nfl_team_label(home_team)}",
+                    value=f"{home_score} Pts" if is_completed else "Scheduled",
+                )
 
             if not is_completed:
                 st.info(f"📅 This {selected_season} NFL matchup ({away_team} @ {home_team}) has not been played yet.")
             else:
                 st.subheader("📊 Official Team Box Score Telemetry")
-                st.caption("🟩 **Green Highlight** indicates the statistical advantage in that category (lower is better for Turnovers).")
+                st.caption(
+                    "🟩 **Green Highlight** indicates the statistical advantage in that category (lower is better for Turnovers)."
+                )
 
                 with st.spinner("Fetching NFL team box score stats..."):
                     box_data = parse_nfl_box_stats(
-                        game_id=selected_game_id, week=selected_week, away_abbr=away_team, home_abbr=home_team, year=selected_season
+                        game_id=selected_game_id,
+                        week=selected_week,
+                        away_abbr=away_team,
+                        home_abbr=home_team,
+                        year=selected_season,
                     )
 
                 if box_data:
@@ -788,7 +895,11 @@ else:
                     home_dict = box_data.get(home_team, {})
 
                     table_rows = [
-                        {"Metric": label, away_team: extract_stat_value(away_dict, keys), home_team: extract_stat_value(home_dict, keys)}
+                        {
+                            "Metric": label,
+                            away_team: extract_stat_value(away_dict, keys),
+                            home_team: extract_stat_value(home_dict, keys),
+                        }
                         for label, keys in metric_definitions
                     ]
                     comparison_df = pd.DataFrame(table_rows)
@@ -802,7 +913,9 @@ else:
 
                 st.divider()
                 st.subheader("🌟 Individual Statistical Leaders")
-                st.caption("Top yardage performer per team in Passing, Rushing, and Receiving (🟩 highlights the higher yardage total).")
+                st.caption(
+                    "Top yardage performer per team in Passing, Rushing, and Receiving (🟩 highlights the higher yardage total)."
+                )
 
                 with st.spinner("Loading NFL player leaders..."):
                     leaders_data = parse_nfl_player_leaders(
@@ -821,17 +934,22 @@ else:
                     for label, cat_key in leader_categories:
                         a_entry = away_leaders.get(cat_key)
                         h_entry = home_leaders.get(cat_key)
-                        leader_rows.append({
-                            "Category": label,
-                            away_team: a_entry["summary"] if a_entry else "N/A",
-                            home_team: h_entry["summary"] if h_entry else "N/A",
-                        })
+                        leader_rows.append(
+                            {
+                                "Category": label,
+                                away_team: a_entry["summary"] if a_entry else "N/A",
+                                home_team: h_entry["summary"] if h_entry else "N/A",
+                            }
+                        )
                         away_yards_list.append(a_entry["yards"] if a_entry else None)
                         home_yards_list.append(h_entry["yards"] if h_entry else None)
 
                     leaders_df = pd.DataFrame(leader_rows)
                     st.dataframe(
-                        leaders_df.style.apply(lambda r: style_leader_winner(r, away_team, home_team, away_yards_list, home_yards_list), axis=1),
+                        leaders_df.style.apply(
+                            lambda r: style_leader_winner(r, away_team, home_team, away_yards_list, home_yards_list),
+                            axis=1,
+                        ),
                         width="stretch",
                         hide_index=True,
                     )
@@ -848,14 +966,23 @@ else:
                     with f_col1:
                         box_impact_filter = st.selectbox(
                             "Filter Plays:",
-                            ["All Plays", "Impact Plays Only (TDs, FGs, Turnovers)", "Scoring Plays Only", "Turnovers Only"],
+                            [
+                                "All Plays",
+                                "Impact Plays Only (TDs, FGs, Turnovers)",
+                                "Scoring Plays Only",
+                                "Turnovers Only",
+                            ],
                             key="nfl_box_play_filter",
                         )
                     with f_col2:
                         box_show_all = st.checkbox("Show All Plays (Max)", value=True, key="nfl_box_show_all")
-                        box_play_limit = st.slider("Plays to Display:", 10, 500, 500, 10, disabled=box_show_all, key="nfl_box_play_limit")
+                        box_play_limit = st.slider(
+                            "Plays to Display:", 10, 500, 500, 10, disabled=box_show_all, key="nfl_box_play_limit"
+                        )
 
-                    st.caption("🎨 **Row Highlight Legend:** 🟩 **Green** = Touchdown | 🟨 **Gold** = Field Goal | 🟥 **Red** = Turnover")
+                    st.caption(
+                        "🎨 **Row Highlight Legend:** 🟩 **Green** = Touchdown | 🟨 **Gold** = Field Goal | 🟥 **Red** = Turnover"
+                    )
                     plays_grid, box_metrics = build_nfl_plays_grid(
                         df_pbp,
                         limit_plays=None if box_show_all else box_play_limit,
@@ -864,7 +991,9 @@ else:
                         home_abbr=home_team,
                     )
                     if not plays_grid.empty:
-                        st.caption(f"Showing **{len(plays_grid)}** of **{box_metrics['total']}** total plays (Chronological Order).")
+                        st.caption(
+                            f"Showing **{len(plays_grid)}** of **{box_metrics['total']}** total plays (Chronological Order)."
+                        )
                         st.dataframe(plays_grid.style.apply(style_impact_rows, axis=1), width="stretch", hide_index=True)
                     else:
                         st.info("No plays match the selected filter.")
@@ -915,13 +1044,19 @@ else:
                 st.subheader(f"📋 Top {display_limit} Match Records Matrix")
                 report_df = filtered_df.head(display_limit).copy()
                 report_df["Explosive"] = report_df["total_points"].apply(lambda x: "Yes" if x >= 60 else "No")
-                display_df = report_df[["week", "home_team", "away_team", "home_pts", "away_pts", "total_points", "margin", "Explosive"]].copy()
-                display_df.columns = ["Week", "Home Team", "Away Team", "Home Points", "Away Points", "Total Points", "Scoring Margin", "Explosive"]
+                display_df = report_df[
+                    ["week", "home_team", "away_team", "home_pts", "away_pts", "total_points", "margin", "Explosive"]
+                ].copy()
+                display_df.columns = [
+                    "Week", "Home Team", "Away Team", "Home Points", "Away Points", "Total Points", "Scoring Margin", "Explosive"
+                ]
                 st.dataframe(display_df, width="stretch", hide_index=True)
 
     elif app_mode == "Play Scouting Engine":
         st.title(f"🏟️ {selected_season} NFL Down & Distance Play Scouting Engine")
-        st.markdown(f"Drill down through **Division ➔ Team ➔ Schedule** to evaluate situational NFL play-by-play telemetry across any **{selected_season}** game.")
+        st.markdown(
+            f"Drill down through **Division ➔ Team ➔ Schedule** to evaluate situational NFL play-by-play telemetry across any **{selected_season}** game."
+        )
 
         with st.spinner(f"Loading {selected_season} NFL schedule..."):
             df_sched = load_nfl_schedule_data(selected_season)
@@ -929,8 +1064,8 @@ else:
         if df_sched.empty:
             st.error(f"Could not load NFL schedule records for {selected_season}.")
         else:
-            selected_team, selected_game_id, selected_week, home_team, away_team, home_score, away_score, is_completed = render_nfl_hierarchy_selector(
-                df_sched, selected_year=selected_season, key_prefix="nfl_plays"
+            selected_team, selected_game_id, selected_week, home_team, away_team, home_score, away_score, is_completed = (
+                render_nfl_hierarchy_selector(df_sched, selected_year=selected_season, key_prefix="nfl_plays")
             )
             st.divider()
             if not is_completed:
@@ -945,13 +1080,24 @@ else:
                     st.subheader("🛠️ Play Analytics Slicing Panel")
                     col1, col2, col3, col4 = st.columns(4)
                     with col1:
-                        selected_offense = st.selectbox("Offensive Unit:", ["All Offenses", away_team, home_team], key="nfl_off_unit")
+                        selected_offense = st.selectbox(
+                            "Offensive Unit:", ["All Offenses", away_team, home_team], key="nfl_off_unit"
+                        )
                     with col2:
-                        selected_down = st.selectbox("Down Profile:", ["All Downs", "1st Down", "2nd Down", "3rd Down", "4th Down"], key="nfl_down_prof")
+                        selected_down = st.selectbox(
+                            "Down Profile:",
+                            ["All Downs", "1st Down", "2nd Down", "3rd Down", "4th Down"],
+                            key="nfl_down_prof",
+                        )
                     with col3:
                         impact_filter = st.selectbox(
                             "Impact Play Filter:",
-                            ["All Plays", "Impact Plays Only (TDs, FGs, Turnovers)", "Scoring Plays Only", "Turnovers Only"],
+                            [
+                                "All Plays",
+                                "Impact Plays Only (TDs, FGs, Turnovers)",
+                                "Scoring Plays Only",
+                                "Turnovers Only",
+                            ],
                             key="nfl_imp_filt",
                         )
                     with col4:
@@ -978,8 +1124,14 @@ else:
                         p3.metric("Scoring Plays (TD / FG)", f"{metrics['td_count']} TDs | {metrics['fg_count']} FGs")
                         p4.metric("Turnovers Forced / Lost", f"{metrics['to_count']} Turnovers")
 
-                        st.caption("🎨 **Row Highlight Legend:** 🟩 **Green** = Touchdown | 🟨 **Gold** = Field Goal | 🟥 **Red** = Turnover")
-                        header_label = f"All {total_p_count} Plays" if show_all_plays else f"Top {len(final_web_grid)} of {total_p_count} Plays"
+                        st.caption(
+                            "🎨 **Row Highlight Legend:** 🟩 **Green** = Touchdown | 🟨 **Gold** = Field Goal | 🟥 **Red** = Turnover"
+                        )
+                        header_label = (
+                            f"All {total_p_count} Plays"
+                            if show_all_plays
+                            else f"Top {len(final_web_grid)} of {total_p_count} Plays"
+                        )
                         st.subheader(f"📋 Down-by-Down Inspection Log ({header_label} — Chronological)")
                         st.dataframe(final_web_grid.style.apply(style_impact_rows, axis=1), width="stretch", hide_index=True)
                     else:

@@ -35,7 +35,7 @@ OUTPUT_DIR = os.getenv("OUTPUT_DIR", "./data")
 AVAILABLE_SEASONS = list(range(2026, 2009, -1))  # 2026 down to 2010
 
 # --- PAGE INITIALIZATION LAYOUT ---
-st.set_page_config(page_title="GridironMetrics Dashboard", page_icon="🏈", layout="wide")
+st.set_page_config(page_title="GridironMetrics", page_icon="🏈", layout="wide")
 
 
 # --- CONSOLIDATED BACKEND DATA LOADERS ---
@@ -490,7 +490,7 @@ def build_plays_grid(
 # =====================================================================
 # APP NAVIGATION SIDEBAR
 # =====================================================================
-st.sidebar.title("🏈 Navigation Matrix")
+st.sidebar.title("🏈 Gridiron Metrics")
 
 selected_league = st.sidebar.radio(
     "🏟️ Select League:",

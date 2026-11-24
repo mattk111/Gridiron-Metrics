@@ -32,7 +32,7 @@ from nfl_season_recap import render_nfl_season_recap
 # --- ENVIRONMENT CONFIGURATION ---
 load_dotenv()
 OUTPUT_DIR = os.getenv("OUTPUT_DIR", "./data")
-AVAILABLE_SEASONS = list(range(2026, 2009, -1))  # 2026 down to 2010
+AVAILABLE_SEASONS = list(range(2026, 2003, -1))  # 2026 down to 2004
 
 # --- PAGE INITIALIZATION LAYOUT ---
 st.set_page_config(page_title="GridironMetrics", page_icon="🏈", layout="wide")

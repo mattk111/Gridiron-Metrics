@@ -84,76 +84,88 @@ def fetch_and_cache_games(year: int = 2026):
     return all_games
 
 
-def fetch_game_team_stats(game_id: int, year: int = 2026) -> list:
-    """Fetches team box score stats for a single CFB game."""
+def fetch_game_team_stats(year: int = 2026, team: str = None, week: int = None, game_id: int = None, **kwargs) -> list:
+    """Fetches team box score stats matching analytics.py keyword arguments (year, team, week, game_id)."""
     games_api = get_games_api()
-    try:
-        stats = games_api.get_game_team_stats(id=int(game_id))
-        return _to_dict_list(stats)
-    except Exception:
-        try:
-            stats = games_api.get_game_team_stats(year=int(year), id=int(game_id))
-            return _to_dict_list(stats)
-        except Exception as e:
-            print(f"Error fetching team stats for game {game_id}: {e}")
-            return []
-
-
-def fetch_game_player_stats(game_id: int, year: int = 2026) -> list:
-    """Fetches individual player box score stats for a single CFB game."""
-    games_api = get_games_api()
-    try:
-        stats = games_api.get_game_player_stats(id=int(game_id))
-        return _to_dict_list(stats)
-    except Exception:
-        try:
-            stats = games_api.get_game_player_stats(year=int(year), id=int(game_id))
-            return _to_dict_list(stats)
-        except Exception as e:
-            print(f"Error fetching player stats for game {game_id}: {e}")
-            return []
-
-
-def fetch_game_plays(game_id: int = None, week: int = None, team: str = None, year: int = 2026) -> list:
-    """Fetches play-by-play data for a CFB game."""
-    plays_api = get_plays_api()
+    results = []
     for s_type in ["regular", "postseason"]:
+        api_kwargs = {"year": int(year)}
+        if team:
+            api_kwargs["team"] = team
+        if week is not None:
+            api_kwargs["week"] = int(week)
+        if game_id is not None:
+            api_kwargs["id"] = int(game_id)
+
         try:
-            kwargs = {"year": int(year), "season_type": s_type}
-            if week is not None:
-                kwargs["week"] = int(week)
-            if team:
-                kwargs["team"] = team
-            plays = plays_api.get_plays(**kwargs)
-            dict_plays = _to_dict_list(plays)
-            if game_id is not None and dict_plays:
-                filtered = [p for p in dict_plays if str(p.get("game_id") or p.get("gameId")) == str(game_id)]
-                if filtered:
-                    return filtered
-            if dict_plays:
-                return dict_plays
+            stats = games_api.get_game_team_stats(season_type=s_type, **api_kwargs)
+            results.extend(_to_dict_list(stats))
         except Exception:
             try:
                 enum_val = cfbd.SeasonType.REGULAR if s_type == "regular" else cfbd.SeasonType.POSTSEASON
-                kwargs = {"year": int(year), "season_type": enum_val}
-                if week is not None:
-                    kwargs["week"] = int(week)
-                if team:
-                    kwargs["team"] = team
-                plays = plays_api.get_plays(**kwargs)
-                dict_plays = _to_dict_list(plays)
-                if game_id is not None and dict_plays:
-                    filtered = [p for p in dict_plays if str(p.get("game_id") or p.get("gameId")) == str(game_id)]
-                    if filtered:
-                        return filtered
-                if dict_plays:
-                    return dict_plays
+                stats = games_api.get_game_team_stats(season_type=enum_val, **api_kwargs)
+                results.extend(_to_dict_list(stats))
             except Exception as e:
-                print(f"Error fetching plays for {year} week {week}: {e}")
-    return []
+                print(f"Error fetching team stats ({year} {s_type}): {e}")
+    return results
 
 
-def fetch_team_roster(team: str, year: int = 2026) -> list:
+def fetch_game_player_stats(year: int = 2026, team: str = None, week: int = None, game_id: int = None, **kwargs) -> list:
+    """Fetches player box score stats matching analytics.py keyword arguments (year, team, week, game_id)."""
+    games_api = get_games_api()
+    results = []
+    for s_type in ["regular", "postseason"]:
+        api_kwargs = {"year": int(year)}
+        if team:
+            api_kwargs["team"] = team
+        if week is not None:
+            api_kwargs["week"] = int(week)
+        if game_id is not None:
+            api_kwargs["id"] = int(game_id)
+
+        try:
+            stats = games_api.get_game_player_stats(season_type=s_type, **api_kwargs)
+            results.extend(_to_dict_list(stats))
+        except Exception:
+            try:
+                enum_val = cfbd.SeasonType.REGULAR if s_type == "regular" else cfbd.SeasonType.POSTSEASON
+                stats = games_api.get_game_player_stats(season_type=enum_val, **api_kwargs)
+                results.extend(_to_dict_list(stats))
+            except Exception as e:
+                print(f"Error fetching player stats ({year} {s_type}): {e}")
+    return results
+
+
+def fetch_game_plays(year: int = 2026, week: int = None, team: str = None, game_id: int = None, **kwargs) -> list:
+    """Fetches play-by-play data matching analytics.py keyword arguments (year, week, team, game_id)."""
+    plays_api = get_plays_api()
+    results = []
+    for s_type in ["regular", "postseason"]:
+        api_kwargs = {"year": int(year)}
+        if week is not None:
+            api_kwargs["week"] = int(week)
+        if team:
+            api_kwargs["team"] = team
+
+        try:
+            plays = plays_api.get_plays(season_type=s_type, **api_kwargs)
+            results.extend(_to_dict_list(plays))
+        except Exception:
+            try:
+                enum_val = cfbd.SeasonType.REGULAR if s_type == "regular" else cfbd.SeasonType.POSTSEASON
+                plays = plays_api.get_plays(season_type=enum_val, **api_kwargs)
+                results.extend(_to_dict_list(plays))
+            except Exception as e:
+                print(f"Error fetching plays ({year} {s_type}): {e}")
+
+    if game_id is not None and results:
+        filtered = [p for p in results if str(p.get("game_id") or p.get("gameId") or p.get("id")) == str(game_id)]
+        if filtered:
+            return filtered
+    return results
+
+
+def fetch_team_roster(team: str, year: int = 2026, **kwargs) -> list:
     """Fetches official season roster for position lookups (QB, RB, WR, TE)."""
     teams_api = get_teams_api()
     try:

@@ -1,4 +1,6 @@
 streamlit
-pandas
 cfbd
+nflreadpy
+pandas
+pyarrow
 python-dotenv

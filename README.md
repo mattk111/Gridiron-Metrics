@@ -4,7 +4,7 @@
 
 Spanning **17 FBS seasons (2010–2026)**, the platform transforms raw game, roster, and play-by-play telemetry into coaching-ready situational insights, side-by-side box score comparisons, positional game leaders, and multi-era championship recaps.
 
-> 🔗 **Live App:** https://gridironmetrics-cfb.streamlit.app/
+> 🔗 **Live App:** https://gridironmetrics.streamlit.app/
 
 ---
 

@@ -1,90 +1,47 @@
-# GridironMetrics-CFB
+# 🏈 GridironMetrics-CFB
 
-A fast football data tool that reads raw game files and instantly turns them into useful stats for coaches. 
+**GridironMetrics-CFB** is an end-to-end College Football analytics, scouting, and historical recap web application built with **Python**, **Streamlit**, **Pandas**, and the **College Football Data (CFBD) API**.
 
-Instead of looking at basic box scores, this tool breaks down every single play to show how efficient an offense is under real game pressure.
+Spanning **17 FBS seasons (2010–2026)**, the platform transforms raw game, roster, and play-by-play telemetry into coaching-ready situational insights, side-by-side box score comparisons, positional game leaders, and multi-era championship recaps.
 
----
-
-## 🏈 Core Analytics Capabilities
-
-### 1. Situational Success Rates
-This tracks if a play actually kept the offense on schedule based on coaching standards:
-*   **1st Down:** Successful if the play gains at least half of the yards needed.
-*   **2nd Down:** Successful if the play gains at least 70% of the yards needed.
-*   **3rd & 4th Down:** Successful only if the play picks up the first down.
-
-### 2. Big-Play Tracking (Explosive Plays)
-The tool automatically highlights chunk plays that shift field positioning:
-*   **Passing Plays:** Any pass that gains 15 or more yards.
-*   **Rushing Plays:** Any run that gains 10 or more yards.
-
-### 3. Opponent Quality Weighting
-A successful play against a top-tier defense matters more than a successful play against a weak opponent. The tool automatically adjusts the final success score based on how talented the opponent's roster is.
-
-### 4. Play-Calling Tendencies
-Automatically calculates down-by-down run/pass ratios so coaches can instantly see team tendencies on 1st down and critical 3rd downs.
+> 🔗 **Live App:** *(Add your Streamlit Community Cloud URL here)*
 
 ---
 
-## 🛠️ How the Data Flows
+## ✨ Key Application Views
 
-[Get Live Game Data] -> [Save Raw Files] -> [Run Math Filters] -> [Print Stats Report]
-```
+### 1. 🔍 Single Game Inspector
+Drill down through **Conference ➔ Team ➔ Schedule** (covering regular season and postseason matchups from 2010–2026) to inspect any completed game:
+* **Official Team Box Score Telemetry:** Side-by-side comparison of Total Yards, Passing Yards, Rushing Yards, First Downs, Turnovers, 3rd Down Conversions, and Completions/Attempts with automated green statistical-advantage highlighting.
+* **Individual Statistical Leaders:** Identifies the top yardage performer for both teams in **Passing**, **Rushing**, and **Receiving**, automatically mapped to official season rosters to display player positions (`QB`, `RB`, `WR`, `TE`) alongside full stat lines.
+* **Chronological Game Play-by-Play Log:** Timestamped play-by-play breakdown sorted chronologically by Quarter, Game Clock, and Drive/Play sequence with running scores and color-coded row highlights for **Touchdowns**, **Field Goals**, and **Turnovers**.
+
+### 2. 📊 Game Analysis Engine
+Evaluates full-season conference performance benchmarks across any selected year (`2010–2026`), calculating average scoring margins, one-score game rates, and explosive game flags (`60+` combined points).
+
+### 3. 🏈 Down & Distance Play Scouting Engine
+A coaching-style situational film room allowing users to filter play-by-play telemetry by **Offensive Unit**, **Down (1st–4th)**, and **Impact Plays**:
+* **Situational Success Rate:** Tracks whether each snap kept the offense on schedule:
+  * **1st Down:** Gains ≥ 50% of yards needed.
+  * **2nd Down:** Gains ≥ 70% of yards needed.
+  * **3rd & 4th Down:** Gains ≥ 100% of yards needed for a first down.
+* **Explosive Chunk Plays:** Flags passing gains of **15+ yards** and rushing gains of **10+ yards**.
+
+### 4. 🏆 Season Recap (2010–2026)
+A historical snapshot of every season across the BCS, 4-Team CFP, and 12-Team CFP eras:
+* **National Championship Summary:** Displays the National Champion, Runner-Up, Title Game score, and National Championship **Offensive & Defensive MVPs**.
+* **FBS Standings Extremes:** Dynamically computes season records from cached game results to highlight the top and bottom FBS records each year.
+* **Conference Champions & Major Award Winners:** Lists every FBS conference champion alongside their final season record (`W–L`), paired with recipients for the **Heisman Trophy**, **Davey O'Brien**, **Doak Walker**, **Fred Biletnikoff**, **John Mackey**, **Dick Butkus**, **Jim Thorpe**, and **Lou Groza** awards.
 
 ---
 
-## 🚀 Example Data Output
-
-When you run the tool, it instantly reads the game data, runs the math, and prints out a clean row-by-row confirmation log like this:
+## 🏗️ Project Architecture
 
 ```text
-Initializing GridironMetrics-CFB Analytics Engine...
-
---- Pipeline Transformation Matrix ---
-<<<<<<< HEAD
-Successfully loaded 6 raw play rows into DataFrame.
-=======
-<<<<<<< HEAD
-Successfully loaded 4 raw play rows into DataFrame.
-
-=======
-Successfully loaded 6 raw play rows into DataFrame.
->>>>>>> 86299fa (Update README.md)
->>>>>>> 9cad283e2b6cc29e4c94efa04bd025f1a05059bd
-Raw Success Rate:             50.0%
-
-Talent-Adjusted Success Index: 31.2
-
-Total Explosive Plays Created: 1
-
---- Coaching Tendency Breakdown ---
-1st Down Play-Calling: Run: 66.7% (2) | Pass: 33.3% (1)
-3rd Down Play-Calling: Run: 0.0% (0) | Pass: 100.0% (1)
-
---- Detailed Play Inspection Log ---
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-
-Play 1: Run | Dn: 1 | Dist: 10 | Yds Gained: 6 | Success: True | Explosive: False
-
-Play 2: Pass | Dn: 2 | Dist: 8 | Yds Gained: 3 | Success: False | Explosive: False
-
-Play 3: Pass | Dn: 3 | Dist: 4 | Yds Gained: 16 | Success: True | Explosive: True
-
-Play 4: Run | Dn: 4 | Dist: 2 | Yds Gained: 1 | Success: False | Explosive: False
-
-=======
->>>>>>> 9cad283e2b6cc29e4c94efa04bd025f1a05059bd
-Play 1: Run | Down: 1 | Dist: 10 | Yds Gained: 6 | Success: True | Explosive: False
-Play 2: Run | Down: 1 | Dist: 10 | Yds Gained: 2 | Success: False | Explosive: False
-Play 3: Pass | Down: 1 | Dist: 10 | Yds Gained: 12 | Success: True | Explosive: False
-Play 4: Pass | Down: 2 | Dist: 8 | Yds Gained: 3 | Success: False | Explosive: False
-Play 5: Pass | Down: 3 | Dist: 4 | Yds Gained: 16 | Success: True | Explosive: True
-Play 6: Run | Down: 4 | Dist: 2 | Yds Gained: 1 | Success: False | Explosive: False
-<<<<<<< HEAD
-=======
->>>>>>> 86299fa (Update README.md)
->>>>>>> 9cad283e2b6cc29e4c94efa04bd025f1a05059bd
-```
+gridironmetrics-cfb/
+├── app.py              # Main Streamlit dashboard, navigation sidebar, and UI renderers
+├── ingest.py           # CFBD SDK data ingestion & local/cloud JSON caching layer
+├── analytics.py        # Box score parsing, roster position mapping, and play-by-play metrics
+├── season_recap.py     # 2010–2026 championship metadata, dynamic standings, and award tables
+├── requirements.txt    # Python dependencies (streamlit, cfbd, pandas, python-dotenv)
+└── data/               # Auto-generated JSON cache to minimize API calls and speed up loads

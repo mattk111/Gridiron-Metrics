@@ -12,6 +12,64 @@ from ingest import (
 CACHE_DIR = get_secret("OUTPUT_DIR", "./data")
 os.makedirs(CACHE_DIR, exist_ok=True)
 
+FBS_CONFERENCES = {
+    "ACC": [
+        "Boston College", "California", "Clemson", "Duke", "Florida State",
+        "Georgia Tech", "Louisville", "Miami", "NC State", "North Carolina",
+        "Pittsburgh", "SMU", "Stanford", "Syracuse", "Virginia",
+        "Virginia Tech", "Wake Forest",
+    ],
+    "American Athletic": [
+        "Army", "Charlotte", "East Carolina", "Florida Atlantic", "Memphis",
+        "Navy", "North Texas", "Rice", "South Florida", "Temple",
+        "Tulane", "Tulsa", "UAB", "UTSA",
+    ],
+    "Big 12": [
+        "Arizona", "Arizona State", "Baylor", "BYU", "Cincinnati",
+        "Colorado", "Houston", "Iowa State", "Kansas", "Kansas State",
+        "Oklahoma State", "TCU", "Texas Tech", "UCF", "Utah", "West Virginia",
+    ],
+    "Big Ten": [
+        "Illinois", "Indiana", "Iowa", "Maryland", "Michigan",
+        "Michigan State", "Minnesota", "Nebraska", "Northwestern", "Ohio State",
+        "Oregon", "Penn State", "Purdue", "Rutgers", "UCLA",
+        "USC", "Washington", "Wisconsin",
+    ],
+    "Conference USA": [
+        "Delaware", "FIU", "Jacksonville State", "Kennesaw State", "Liberty",
+        "Louisiana Tech", "Middle Tennessee", "Missouri State", "New Mexico State",
+        "Sam Houston", "UTEP", "Western Kentucky",
+    ],
+    "FBS Independents": [
+        "Notre Dame", "UConn",
+    ],
+    "Mid-American": [
+        "Akron", "Ball State", "Bowling Green", "Buffalo", "Central Michigan",
+        "Eastern Michigan", "Kent State", "Massachusetts", "Miami (OH)",
+        "Northern Illinois", "Ohio", "Toledo", "Western Michigan",
+    ],
+    "Mountain West": [
+        "Air Force", "Boise State", "Colorado State", "Fresno State", "Hawai'i",
+        "Nevada", "New Mexico", "San Diego State", "San José State", "UNLV",
+        "Utah State", "Wyoming",
+    ],
+    "Pac-12": [
+        "Oregon State", "Washington State",
+    ],
+    "SEC": [
+        "Alabama", "Arkansas", "Auburn", "Florida", "Georgia",
+        "Kentucky", "LSU", "Mississippi State", "Missouri", "Oklahoma",
+        "Ole Miss", "South Carolina", "Tennessee", "Texas", "Texas A&M",
+        "Vanderbilt",
+    ],
+    "Sun Belt": [
+        "App State", "Arkansas State", "Coastal Carolina", "Georgia Southern",
+        "Georgia State", "James Madison", "Louisiana", "Marshall",
+        "Old Dominion", "South Alabama", "Southern Miss", "Texas State",
+        "Troy", "UL Monroe",
+    ],
+}
+
 
 def _get_val(d: dict, *keys, default=None):
     """Safely fetches the first matching key (supports both snake_case and camelCase)."""
@@ -23,26 +81,48 @@ def _get_val(d: dict, *keys, default=None):
     return default
 
 
-def get_teams_by_conference(df_games: pd.DataFrame, conference: str) -> list:
-    if df_games is None or df_games.empty or not conference:
-        return []
-    cols = df_games.columns.tolist()
-    home_conf_key = next((c for c in cols if "conference" in c.lower() and "home" in c.lower()), None)
-    away_conf_key = next((c for c in cols if "conference" in c.lower() and "away" in c.lower()), None)
-    home_team_key = next((c for c in cols if "home_team" in c.lower() or "hometeam" in c.lower()), "home_team")
-    away_team_key = next((c for c in cols if "away_team" in c.lower() or "awayteam" in c.lower()), "away_team")
+def get_available_conferences(df_games: pd.DataFrame) -> list:
+    """Returns sorted FBS conferences from df_games, falling back to FBS_CONFERENCES if null."""
+    if df_games is not None and not df_games.empty:
+        cols = df_games.columns.tolist()
+        home_conf_key = next((c for c in cols if "conference" in c.lower() and "home" in c.lower()), None)
+        if home_conf_key:
+            confs = sorted(
+                c for c in df_games[home_conf_key].dropna().unique().tolist()
+                if str(c).strip() and str(c).strip().lower() != "none"
+            )
+            if confs:
+                return confs
+    return sorted(FBS_CONFERENCES.keys())
 
+
+def get_teams_by_conference(df_games: pd.DataFrame, conference: str) -> list:
+    if not conference:
+        return []
     target = str(conference).strip().lower()
     teams = set()
 
-    if home_conf_key:
-        h_matches = df_games[df_games[home_conf_key].fillna("").astype(str).str.lower() == target]
-        teams.update(h_matches[home_team_key].dropna().unique().tolist())
-    if away_conf_key:
-        a_matches = df_games[df_games[away_conf_key].fillna("").astype(str).str.lower() == target]
-        teams.update(a_matches[away_team_key].dropna().unique().tolist())
+    if df_games is not None and not df_games.empty:
+        cols = df_games.columns.tolist()
+        home_conf_key = next((c for c in cols if "conference" in c.lower() and "home" in c.lower()), None)
+        away_conf_key = next((c for c in cols if "conference" in c.lower() and "away" in c.lower()), None)
+        home_team_key = next((c for c in cols if "home_team" in c.lower() or "hometeam" in c.lower()), "home_team")
+        away_team_key = next((c for c in cols if "away_team" in c.lower() or "awayteam" in c.lower()), "away_team")
 
-    return sorted(teams)
+        if home_conf_key and home_team_key in df_games.columns:
+            h_matches = df_games[df_games[home_conf_key].fillna("").astype(str).str.lower() == target]
+            teams.update(h_matches[home_team_key].dropna().unique().tolist())
+        if away_conf_key and away_team_key in df_games.columns:
+            a_matches = df_games[df_games[away_conf_key].fillna("").astype(str).str.lower() == target]
+            teams.update(a_matches[away_team_key].dropna().unique().tolist())
+
+    if teams:
+        return sorted(teams)
+
+    for conf_name, conf_teams in FBS_CONFERENCES.items():
+        if conf_name.lower() == target:
+            return sorted(conf_teams)
+    return []
 
 
 def get_team_schedule(df_games: pd.DataFrame, team_name: str) -> pd.DataFrame:
@@ -52,6 +132,9 @@ def get_team_schedule(df_games: pd.DataFrame, team_name: str) -> pd.DataFrame:
     home_team_key = next((c for c in cols if "home_team" in c.lower() or "hometeam" in c.lower()), "home_team")
     away_team_key = next((c for c in cols if "away_team" in c.lower() or "awayteam" in c.lower()), "away_team")
     season_type_key = next((c for c in cols if "season_type" in c.lower() or "seasontype" in c.lower()), None)
+
+    if home_team_key not in df_games.columns or away_team_key not in df_games.columns:
+        return pd.DataFrame()
 
     target = str(team_name).strip().lower()
     sub = df_games[
@@ -90,13 +173,11 @@ def _load_or_fetch_team_stats(year: int, team_name: str, game_id) -> list:
             with open(cache_path, "w", encoding="utf-8") as f:
                 json.dump(records, f, default=str)
 
-    # Filter to matching game_id if present
     for r in records:
         gid = _get_val(r, "id", "game_id", "gameId")
         if str(gid) == str(game_id):
             return [r]
 
-    # Fallback: query directly by game_id if team query missed it
     direct = fetch_game_team_stats(year=year, game_id=game_id)
     return direct if direct else records
 
@@ -203,7 +284,6 @@ def parse_game_player_leaders(game_id: int, team_name: str, year: int = 2026) ->
             if cat_name not in ["passing", "rushing", "receiving"]:
                 continue
 
-            # Collect stat types -> athlete -> value
             athlete_stats = {}
             for typ in _get_val(cat_obj, "types", default=[]):
                 t_name = str(_get_val(typ, "name", default="")).upper()
@@ -278,7 +358,6 @@ def get_game_plays_df(game_id: int, week: int, team_name: str, year: int = 2026)
 
     df = pd.DataFrame(plays)
 
-    # Normalize camelCase columns from cfbd v5 to the snake_case column names app.py expects
     rename_map = {
         "offenseTeam": "offense_team",
         "playType": "play_type",

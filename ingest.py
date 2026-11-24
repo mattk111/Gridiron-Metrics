@@ -46,14 +46,59 @@ def get_teams_api():
     return cfbd.TeamsApi(cfbd.ApiClient(get_api_configuration()))
 
 
+def _normalize_record(d: dict) -> dict:
+    """Adds snake_case aliases for cfbd v5 camelCase fields so app.py & analytics.py always find them."""
+    aliases = {
+        "homeTeam": "home_team",
+        "awayTeam": "away_team",
+        "homeConference": "home_conference",
+        "awayConference": "away_conference",
+        "homeClassification": "home_classification",
+        "awayClassification": "away_classification",
+        "homePoints": "home_points",
+        "awayPoints": "away_points",
+        "seasonType": "season_type",
+        "startDate": "start_date",
+        "gameId": "game_id",
+        "offenseTeam": "offense_team",
+        "playType": "play_type",
+        "yardsGained": "yards_gained",
+        "playText": "play_text",
+        "driveNumber": "drive_number",
+        "playNumber": "play_number",
+        "offenseScore": "offense_score",
+        "defenseScore": "defense_score",
+    }
+    out = dict(d)
+    for camel, snake in aliases.items():
+        if camel in out and snake not in out:
+            out[snake] = out[camel]
+    return out
+
+
 def _to_dict_list(items) -> list:
     out = []
     for item in items or []:
         if hasattr(item, "to_dict"):
-            out.append(item.to_dict())
+            out.append(_normalize_record(item.to_dict()))
         elif isinstance(item, dict):
-            out.append(item)
+            out.append(_normalize_record(item))
     return out
+
+
+def _call_with_season_type(fn, s_type_str: str, **kwargs):
+    """Calls a cfbd endpoint trying string season_type first, then cfbd.SeasonType enum."""
+    try:
+        return fn(season_type=s_type_str, **kwargs)
+    except Exception:
+        if hasattr(cfbd, "SeasonType"):
+            enum_val = (
+                cfbd.SeasonType.REGULAR
+                if s_type_str == "regular"
+                else cfbd.SeasonType.POSTSEASON
+            )
+            return fn(season_type=enum_val, **kwargs)
+        raise
 
 
 def fetch_and_cache_games(year: int = 2026):
@@ -64,18 +109,18 @@ def fetch_and_cache_games(year: int = 2026):
 
     games_api = get_games_api()
     all_games = []
+    last_err = None
 
     for s_type in ["regular", "postseason"]:
         try:
-            games = games_api.get_games(year=int(year), season_type=s_type)
+            games = _call_with_season_type(games_api.get_games, s_type, year=int(year))
             all_games.extend(_to_dict_list(games))
-        except Exception:
-            try:
-                enum_val = cfbd.SeasonType.REGULAR if s_type == "regular" else cfbd.SeasonType.POSTSEASON
-                games = games_api.get_games(year=int(year), season_type=enum_val)
-                all_games.extend(_to_dict_list(games))
-            except Exception as e:
-                print(f"Warning fetching {year} {s_type} games: {e}")
+        except Exception as e:
+            last_err = e
+            print(f"Warning fetching {year} {s_type} games: {e}")
+
+    if not all_games and last_err is not None:
+        raise RuntimeError(f"CFBD get_games({year}) failed: {last_err}")
 
     if all_games:
         with open(filepath, "w", encoding="utf-8") as f:
@@ -85,7 +130,7 @@ def fetch_and_cache_games(year: int = 2026):
 
 
 def fetch_game_team_stats(year: int = 2026, team: str = None, week: int = None, game_id: int = None, **kwargs) -> list:
-    """Fetches team box score stats matching analytics.py keyword arguments (year, team, week, game_id)."""
+    """Fetches team box score stats matching analytics.py keyword arguments."""
     games_api = get_games_api()
     results = []
     for s_type in ["regular", "postseason"]:
@@ -96,22 +141,16 @@ def fetch_game_team_stats(year: int = 2026, team: str = None, week: int = None, 
             api_kwargs["week"] = int(week)
         if game_id is not None:
             api_kwargs["id"] = int(game_id)
-
         try:
-            stats = games_api.get_game_team_stats(season_type=s_type, **api_kwargs)
+            stats = _call_with_season_type(games_api.get_game_team_stats, s_type, **api_kwargs)
             results.extend(_to_dict_list(stats))
-        except Exception:
-            try:
-                enum_val = cfbd.SeasonType.REGULAR if s_type == "regular" else cfbd.SeasonType.POSTSEASON
-                stats = games_api.get_game_team_stats(season_type=enum_val, **api_kwargs)
-                results.extend(_to_dict_list(stats))
-            except Exception as e:
-                print(f"Error fetching team stats ({year} {s_type}): {e}")
+        except Exception as e:
+            print(f"Error fetching team stats ({year} {s_type}): {e}")
     return results
 
 
 def fetch_game_player_stats(year: int = 2026, team: str = None, week: int = None, game_id: int = None, **kwargs) -> list:
-    """Fetches player box score stats matching analytics.py keyword arguments (year, team, week, game_id)."""
+    """Fetches player box score stats matching analytics.py keyword arguments."""
     games_api = get_games_api()
     results = []
     for s_type in ["regular", "postseason"]:
@@ -122,22 +161,16 @@ def fetch_game_player_stats(year: int = 2026, team: str = None, week: int = None
             api_kwargs["week"] = int(week)
         if game_id is not None:
             api_kwargs["id"] = int(game_id)
-
         try:
-            stats = games_api.get_game_player_stats(season_type=s_type, **api_kwargs)
+            stats = _call_with_season_type(games_api.get_game_player_stats, s_type, **api_kwargs)
             results.extend(_to_dict_list(stats))
-        except Exception:
-            try:
-                enum_val = cfbd.SeasonType.REGULAR if s_type == "regular" else cfbd.SeasonType.POSTSEASON
-                stats = games_api.get_game_player_stats(season_type=enum_val, **api_kwargs)
-                results.extend(_to_dict_list(stats))
-            except Exception as e:
-                print(f"Error fetching player stats ({year} {s_type}): {e}")
+        except Exception as e:
+            print(f"Error fetching player stats ({year} {s_type}): {e}")
     return results
 
 
 def fetch_game_plays(year: int = 2026, week: int = None, team: str = None, game_id: int = None, **kwargs) -> list:
-    """Fetches play-by-play data matching analytics.py keyword arguments (year, week, team, game_id)."""
+    """Fetches play-by-play data matching analytics.py keyword arguments."""
     plays_api = get_plays_api()
     results = []
     for s_type in ["regular", "postseason"]:
@@ -146,17 +179,11 @@ def fetch_game_plays(year: int = 2026, week: int = None, team: str = None, game_
             api_kwargs["week"] = int(week)
         if team:
             api_kwargs["team"] = team
-
         try:
-            plays = plays_api.get_plays(season_type=s_type, **api_kwargs)
+            plays = _call_with_season_type(plays_api.get_plays, s_type, **api_kwargs)
             results.extend(_to_dict_list(plays))
-        except Exception:
-            try:
-                enum_val = cfbd.SeasonType.REGULAR if s_type == "regular" else cfbd.SeasonType.POSTSEASON
-                plays = plays_api.get_plays(season_type=enum_val, **api_kwargs)
-                results.extend(_to_dict_list(plays))
-            except Exception as e:
-                print(f"Error fetching plays ({year} {s_type}): {e}")
+        except Exception as e:
+            print(f"Error fetching plays ({year} {s_type}): {e}")
 
     if game_id is not None and results:
         filtered = [p for p in results if str(p.get("game_id") or p.get("gameId") or p.get("id")) == str(game_id)]

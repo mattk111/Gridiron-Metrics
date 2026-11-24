@@ -41,14 +41,19 @@ st.set_page_config(page_title="GridironMetrics Dashboard", page_icon="🏈", lay
 @st.cache_data(ttl=3600)
 def load_game_data(year: int):
     """Loads CFB schedule data for any season (2010-2026), auto-fetching from CFBD if not cached."""
+    from ingest import fetch_and_cache_games, _normalize_record
     filepath = os.path.join(OUTPUT_DIR, f"records_{year}.json")
-    if not os.path.exists(filepath):
-        from ingest import fetch_and_cache_games
-        fetch_and_cache_games(year=year)
+    records = []
     if os.path.exists(filepath):
-        with open(filepath, "r", encoding="utf-8") as f:
-            return pd.DataFrame(json.load(f))
-    return pd.DataFrame()
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                raw = json.load(f)
+                records = [_normalize_record(r) for r in raw]
+        except Exception:
+            records = []
+    if not records:
+        records = fetch_and_cache_games(year=year)
+    return pd.DataFrame(records) if records else pd.DataFrame()
 
 
 @st.cache_data(ttl=3600)

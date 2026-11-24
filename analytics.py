@@ -1,231 +1,296 @@
-import json
 import os
-import re
+import json
 import pandas as pd
-from dotenv import load_dotenv
+from ingest import (
+    get_secret,
+    fetch_game_team_stats,
+    fetch_game_player_stats,
+    fetch_game_plays,
+    fetch_team_roster,
+)
 
-load_dotenv()
+CACHE_DIR = get_secret("OUTPUT_DIR", "./data")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
-OUTPUT_DIR = os.getenv("OUTPUT_DIR", "./data")
-DEFAULT_FILEPATH = os.path.join(OUTPUT_DIR, "records_2025.json")
 
-def load_raw_data(filepath: str = DEFAULT_FILEPATH) -> pd.DataFrame:
-    if not os.path.exists(filepath):
-        raise FileNotFoundError(f"Missing live data file at: {filepath}. Run ingest.py first!")
-    with open(filepath, 'r', encoding='utf-8') as f:
-        data = json.load(f)
-    return pd.DataFrame(data)
+def _get_val(d: dict, *keys, default=None):
+    """Safely fetches the first matching key (supports both snake_case and camelCase)."""
+    if not isinstance(d, dict):
+        return default
+    for k in keys:
+        if k in d and d[k] is not None:
+            return d[k]
+    return default
 
-def get_teams_by_conference(df: pd.DataFrame, conference: str) -> list:
-    cols = df.columns.tolist()
-    home_conf_key = next((c for c in cols if 'conference' in c.lower() and 'home' in c.lower()), None)
-    away_conf_key = next((c for c in cols if 'conference' in c.lower() and 'away' in c.lower()), None)
-    home_team_key = next((c for c in cols if 'home_team' in c.lower() or 'hometeam' in c.lower()), 'home_team')
-    away_team_key = next((c for c in cols if 'away_team' in c.lower() or 'awayteam' in c.lower()), 'away_team')
 
+def get_teams_by_conference(df_games: pd.DataFrame, conference: str) -> list:
+    if df_games is None or df_games.empty or not conference:
+        return []
+    cols = df_games.columns.tolist()
+    home_conf_key = next((c for c in cols if "conference" in c.lower() and "home" in c.lower()), None)
+    away_conf_key = next((c for c in cols if "conference" in c.lower() and "away" in c.lower()), None)
+    home_team_key = next((c for c in cols if "home_team" in c.lower() or "hometeam" in c.lower()), "home_team")
+    away_team_key = next((c for c in cols if "away_team" in c.lower() or "awayteam" in c.lower()), "away_team")
+
+    target = str(conference).strip().lower()
     teams = set()
-    if home_conf_key and away_conf_key:
-        target = conference.lower()
-        home_matches = df[df[home_conf_key].astype(str).str.lower() == target][home_team_key].dropna()
-        away_matches = df[df[away_conf_key].astype(str).str.lower() == target][away_team_key].dropna()
-        teams.update(home_matches)
-        teams.update(away_matches)
-    return sorted(list(teams))
 
-def get_team_schedule(df: pd.DataFrame, team_name: str) -> pd.DataFrame:
-    cols = df.columns.tolist()
-    home_team_key = next((c for c in cols if 'home_team' in c.lower() or 'hometeam' in c.lower()), 'home_team')
-    away_team_key = next((c for c in cols if 'away_team' in c.lower() or 'awayteam' in c.lower()), 'away_team')
+    if home_conf_key:
+        h_matches = df_games[df_games[home_conf_key].fillna("").astype(str).str.lower() == target]
+        teams.update(h_matches[home_team_key].dropna().unique().tolist())
+    if away_conf_key:
+        a_matches = df_games[df_games[away_conf_key].fillna("").astype(str).str.lower() == target]
+        teams.update(a_matches[away_team_key].dropna().unique().tolist())
 
-    schedule_df = df[(df[home_team_key] == team_name) | (df[away_team_key] == team_name)].copy()
-    if 'week' in schedule_df.columns:
-        schedule_df = schedule_df.sort_values(by='week')
-    return schedule_df
+    return sorted(teams)
 
-def parse_game_box_stats(game_id: int, team_name: str, year: int = 2025) -> dict:
-    from ingest import fetch_game_team_stats
-    box_records = fetch_game_team_stats(year=year, team=team_name)
-    
-    selected_game = None
-    for record in box_records:
-        rec_id = record.get('id') or record.get('game_id')
-        if str(rec_id) == str(game_id):
-            selected_game = record
-            break
-            
-    if not selected_game:
+
+def get_team_schedule(df_games: pd.DataFrame, team_name: str) -> pd.DataFrame:
+    if df_games is None or df_games.empty or not team_name:
+        return pd.DataFrame()
+    cols = df_games.columns.tolist()
+    home_team_key = next((c for c in cols if "home_team" in c.lower() or "hometeam" in c.lower()), "home_team")
+    away_team_key = next((c for c in cols if "away_team" in c.lower() or "awayteam" in c.lower()), "away_team")
+    season_type_key = next((c for c in cols if "season_type" in c.lower() or "seasontype" in c.lower()), None)
+
+    target = str(team_name).strip().lower()
+    sub = df_games[
+        (df_games[home_team_key].fillna("").astype(str).str.lower() == target)
+        | (df_games[away_team_key].fillna("").astype(str).str.lower() == target)
+    ].copy()
+
+    if sub.empty:
+        return sub
+
+    sub["_stype_ord"] = (
+        sub[season_type_key].apply(lambda x: 1 if str(x).lower() == "postseason" else 0)
+        if season_type_key
+        else 0
+    )
+    if "week" in sub.columns:
+        sub = sub.sort_values(by=["_stype_ord", "week"], ascending=[True, True])
+    return sub.drop(columns=["_stype_ord"], errors="ignore")
+
+
+def _load_or_fetch_team_stats(year: int, team_name: str, game_id) -> list:
+    safe_team = "".join(c if c.isalnum() else "_" for c in str(team_name))
+    cache_path = os.path.join(CACHE_DIR, f"box_{year}_{safe_team}.json")
+    records = []
+
+    if os.path.exists(cache_path):
+        try:
+            with open(cache_path, "r", encoding="utf-8") as f:
+                records = json.load(f)
+        except Exception:
+            records = []
+
+    if not records:
+        records = fetch_game_team_stats(year=year, team=team_name)
+        if records:
+            with open(cache_path, "w", encoding="utf-8") as f:
+                json.dump(records, f, default=str)
+
+    # Filter to matching game_id if present
+    for r in records:
+        gid = _get_val(r, "id", "game_id", "gameId")
+        if str(gid) == str(game_id):
+            return [r]
+
+    # Fallback: query directly by game_id if team query missed it
+    direct = fetch_game_team_stats(year=year, game_id=game_id)
+    return direct if direct else records
+
+
+def parse_game_box_stats(game_id: int, team_name: str, year: int = 2026) -> dict:
+    """Parses CFBD team box score stats into {school_name: {stat_key: stat_val}}."""
+    records = _load_or_fetch_team_stats(year=year, team_name=team_name, game_id=game_id)
+    if not records:
         return {}
 
-    parsed_stats = {}
-    for team_entry in selected_game.get('teams', []):
-        t_name = team_entry.get('school') or team_entry.get('team')
-        stat_dict = {}
-        for stat in team_entry.get('stats', []):
-            category = stat.get('category')
-            value = stat.get('stat')
-            stat_dict[category] = value
-            clean_cat = str(category).lower().replace(' ', '').replace('_', '')
-            stat_dict[clean_cat] = value
-        parsed_stats[t_name] = stat_dict
+    game_obj = records[0]
+    teams_list = _get_val(game_obj, "teams", default=[])
+    parsed = {}
 
-    return parsed_stats
-
-def _normalize_player_name(name: str) -> str:
-    """Strips suffixes (Jr., Sr., II, III, IV) and punctuation for reliable name matching."""
-    s = str(name or "").lower().strip()
-    s = re.sub(r"[.,']", "", s)
-    s = re.sub(r"\b(jr|sr|ii|iii|iv|v)\b", "", s)
-    s = re.sub(r"\s+", " ", s).strip()
-    return s
-
-def _build_roster_position_lookup(year: int, team_name: str) -> tuple[dict, dict]:
-    """Builds (id_to_pos, normalized_name_to_pos) maps from cached team roster data."""
-    from ingest import fetch_team_roster
-    roster = fetch_team_roster(year=year, team=team_name)
-    id_map = {}
-    name_map = {}
-
-    for p in roster:
-        pos = str(p.get('position') or '').strip().upper()
-        if not pos:
+    for t in teams_list:
+        school = _get_val(t, "school", "team")
+        if not school:
             continue
+        stat_map = {}
+        for s in _get_val(t, "stats", default=[]):
+            cat = _get_val(s, "category", "name")
+            val = _get_val(s, "stat", "value")
+            if cat is not None:
+                stat_map[str(cat)] = val
+                stat_map[str(cat).lower().replace(" ", "").replace("_", "")] = val
+        parsed[school] = stat_map
 
-        p_id = p.get('id')
-        if p_id is not None:
-            id_map[str(p_id).strip()] = pos
+    return parsed
 
-        first = str(p.get('first_name') or p.get('firstName') or '').strip()
-        last = str(p.get('last_name') or p.get('lastName') or '').strip()
-        combined = f"{first} {last}".strip()
-        raw_name = str(p.get('name') or p.get('full_name') or combined).strip()
 
-        norm_name = _normalize_player_name(raw_name)
-        if norm_name:
-            name_map[norm_name] = pos
+def _get_roster_position_map(team_name: str, year: int) -> dict:
+    safe_team = "".join(c if c.isalnum() else "_" for c in str(team_name))
+    cache_path = os.path.join(CACHE_DIR, f"roster_{year}_{safe_team}.json")
+    roster = []
 
-    return id_map, name_map
+    if os.path.exists(cache_path):
+        try:
+            with open(cache_path, "r", encoding="utf-8") as f:
+                roster = json.load(f)
+        except Exception:
+            roster = []
 
-def parse_game_player_leaders(game_id: int, team_name: str, year: int = 2025) -> dict:
-    """
-    Extracts the statistical leader in passing, rushing, and receiving yards
-    for each team in a given game, prefixed with their roster position (e.g., 'QB Jayden Daniels').
-    """
-    from ingest import fetch_game_player_stats
-    player_records = fetch_game_player_stats(year=year, team=team_name)
+    if not roster:
+        roster = fetch_team_roster(team=team_name, year=year)
+        if roster:
+            with open(cache_path, "w", encoding="utf-8") as f:
+                json.dump(roster, f, default=str)
 
-    selected_game = None
-    for record in player_records:
-        rec_id = record.get('id') or record.get('game_id')
-        if str(rec_id) == str(game_id):
-            selected_game = record
-            break
+    pos_map = {}
+    for p in roster:
+        pid = _get_val(p, "id", "player_id", "playerId")
+        first = str(_get_val(p, "first_name", "firstName", default="")).strip()
+        last = str(_get_val(p, "last_name", "lastName", default="")).strip()
+        full = f"{first} {last}".strip()
+        pos = str(_get_val(p, "position", default="")).strip()
+        if pid is not None and pos:
+            pos_map[str(pid)] = pos
+        if full and pos:
+            pos_map[full.lower()] = pos
+    return pos_map
 
-    if not selected_game:
+
+def parse_game_player_leaders(game_id: int, team_name: str, year: int = 2026) -> dict:
+    """Extracts Passing, Rushing, and Receiving yardage leaders per team with roster positions."""
+    safe_team = "".join(c if c.isalnum() else "_" for c in str(team_name))
+    cache_path = os.path.join(CACHE_DIR, f"players_{year}_{safe_team}.json")
+    records = []
+
+    if os.path.exists(cache_path):
+        try:
+            with open(cache_path, "r", encoding="utf-8") as f:
+                records = json.load(f)
+        except Exception:
+            records = []
+
+    if not records:
+        records = fetch_game_player_stats(year=year, team=team_name)
+        if records:
+            with open(cache_path, "w", encoding="utf-8") as f:
+                json.dump(records, f, default=str)
+
+    game_obj = next(
+        (r for r in records if str(_get_val(r, "id", "game_id", "gameId")) == str(game_id)),
+        None,
+    )
+    if not game_obj:
+        direct = fetch_game_player_stats(year=year, game_id=game_id)
+        game_obj = direct[0] if direct else None
+    if not game_obj:
         return {}
 
-    target_categories = ['passing', 'rushing', 'receiving']
-    default_pos_by_cat = {'passing': 'QB', 'rushing': 'RB', 'receiving': 'WR'}
     leaders_by_team = {}
+    default_pos = {"passing": "QB", "rushing": "RB", "receiving": "WR"}
 
-    for team_entry in selected_game.get('teams', []):
-        t_name = team_entry.get('school') or team_entry.get('team')
-        leaders_by_team[t_name] = {cat: None for cat in target_categories}
-        id_map, name_map = _build_roster_position_lookup(year=year, team_name=t_name)
+    for t in _get_val(game_obj, "teams", default=[]):
+        school = _get_val(t, "school", "team")
+        if not school:
+            continue
+        pos_map = _get_roster_position_map(school, year)
+        leaders_by_team[school] = {"passing": None, "rushing": None, "receiving": None}
 
-        for cat_entry in team_entry.get('categories', []):
-            cat_name = str(cat_entry.get('name', '')).lower()
-            if cat_name not in target_categories:
+        for cat_obj in _get_val(t, "categories", default=[]):
+            cat_name = str(_get_val(cat_obj, "name", default="")).lower()
+            if cat_name not in ["passing", "rushing", "receiving"]:
                 continue
 
-            player_stats_map = {}
-            for type_entry in cat_entry.get('types', []):
-                stat_type = str(type_entry.get('name', '')).upper()
-                for athlete in type_entry.get('athletes', []):
-                    p_name = athlete.get('name', 'Unknown')
-                    p_id = athlete.get('id')
-                    stat_val = athlete.get('stat', '0')
-                    if p_name not in player_stats_map:
-                        player_stats_map[p_name] = {"_id": p_id}
-                    player_stats_map[p_name][stat_type] = stat_val
+            # Collect stat types -> athlete -> value
+            athlete_stats = {}
+            for typ in _get_val(cat_obj, "types", default=[]):
+                t_name = str(_get_val(typ, "name", default="")).upper()
+                for ath in _get_val(typ, "athletes", default=[]):
+                    aid = str(_get_val(ath, "id", default=_get_val(ath, "name", default="")))
+                    aname = str(_get_val(ath, "name", default="Unknown")).strip()
+                    stat_val = str(_get_val(ath, "stat", default="0")).strip()
+                    if aid not in athlete_stats:
+                        athlete_stats[aid] = {"id": aid, "name": aname}
+                    athlete_stats[aid][t_name] = stat_val
 
-            best_player = None
-            best_yards = float('-inf')
-            best_raw_stats = {}
-
-            for p_name, stats_dict in player_stats_map.items():
+            best_ath = None
+            best_yds = -9999.0
+            for ath in athlete_stats.values():
                 try:
-                    yds = float(stats_dict.get('YDS', 0))
-                except (ValueError, TypeError):
+                    yds = float(ath.get("YDS", 0))
+                except ValueError:
                     yds = 0.0
+                if yds > best_yds:
+                    best_yds = yds
+                    best_ath = ath
 
-                if yds > best_yards:
-                    best_yards = yds
-                    best_player = p_name
-                    best_raw_stats = stats_dict
+            if best_ath and best_yds > -9999.0:
+                aname = best_ath["name"]
+                aid = best_ath["id"]
+                pos = pos_map.get(aid) or pos_map.get(aname.lower()) or default_pos[cat_name]
+                yds_int = int(best_yds)
 
-            if best_player is not None:
-                p_id_str = str(best_raw_stats.get("_id")).strip() if best_raw_stats.get("_id") is not None else ""
-                norm_player = _normalize_player_name(best_player)
+                if cat_name == "passing":
+                    c_att = best_ath.get("C/ATT", "0/0")
+                    tds = best_ath.get("TD", "0")
+                    ints = best_ath.get("INT", "0")
+                    summary = f"{pos} {aname} ({c_att}, {yds_int} YDS, {tds} TD, {ints} INT)"
+                elif cat_name == "rushing":
+                    car = best_ath.get("CAR", "0")
+                    tds = best_ath.get("TD", "0")
+                    summary = f"{pos} {aname} ({car} CAR, {yds_int} YDS, {tds} TD)"
+                else:
+                    rec = best_ath.get("REC", "0")
+                    tds = best_ath.get("TD", "0")
+                    summary = f"{pos} {aname} ({rec} REC, {yds_int} YDS, {tds} TD)"
 
-                pos = (
-                    id_map.get(p_id_str)
-                    or name_map.get(norm_player)
-                    or default_pos_by_cat.get(cat_name, "")
-                )
-                player_display = f"{pos} {best_player}".strip() if pos else best_player
-
-                yds_int = int(best_yards) if best_yards.is_integer() else best_yards
-                if cat_name == 'passing':
-                    c_att = best_raw_stats.get('C/ATT', '')
-                    tds = best_raw_stats.get('TD', '0')
-                    ints = best_raw_stats.get('INT', '0')
-                    detail = f"{c_att}, {yds_int} YDS, {tds} TD, {ints} INT" if c_att else f"{yds_int} YDS, {tds} TD, {ints} INT"
-                elif cat_name == 'rushing':
-                    car = best_raw_stats.get('CAR', '0')
-                    tds = best_raw_stats.get('TD', '0')
-                    detail = f"{car} CAR, {yds_int} YDS, {tds} TD"
-                else:  # receiving
-                    rec = best_raw_stats.get('REC', '0')
-                    tds = best_raw_stats.get('TD', '0')
-                    detail = f"{rec} REC, {yds_int} YDS, {tds} TD"
-
-                leaders_by_team[t_name][cat_name] = {
-                    "player": player_display,
-                    "yards": best_yards,
-                    "summary": f"{player_display} ({detail})"
+                leaders_by_team[school][cat_name] = {
+                    "player": f"{pos} {aname}",
+                    "yards": float(yds_int),
+                    "summary": summary,
                 }
 
     return leaders_by_team
 
-def get_game_plays_df(game_id: int, week: int, team_name: str, year: int = 2025) -> pd.DataFrame:
-    from ingest import fetch_game_plays
-    plays_records = fetch_game_plays(year=year, week=week, team=team_name)
-    if not plays_records:
+
+def get_game_plays_df(game_id: int, week: int, team_name: str, year: int = 2026) -> pd.DataFrame:
+    """Fetches CFB play-by-play data and normalizes camelCase/snake_case keys for app.py."""
+    cache_path = os.path.join(CACHE_DIR, f"plays_{year}_{game_id}.json")
+    plays = []
+
+    if os.path.exists(cache_path):
+        try:
+            with open(cache_path, "r", encoding="utf-8") as f:
+                plays = json.load(f)
+        except Exception:
+            plays = []
+
+    if not plays:
+        plays = fetch_game_plays(year=year, week=week, team=team_name, game_id=game_id)
+        if plays:
+            with open(cache_path, "w", encoding="utf-8") as f:
+                json.dump(plays, f, default=str)
+
+    if not plays:
         return pd.DataFrame()
-        
-    df_plays = pd.DataFrame(plays_records)
-    cols = df_plays.columns.tolist()
-    game_id_key = next((c for c in cols if c.lower() in ['game_id', 'gameid']), None)
-    
-    if game_id_key and game_id:
-        filtered = df_plays[df_plays[game_id_key].astype(str) == str(game_id)].copy()
-        if not filtered.empty:
-            return filtered
-            
-    return df_plays
 
-def calculate_coaching_metrics(df: pd.DataFrame) -> pd.DataFrame:
-    processed_df = df.copy()
-    cols = processed_df.columns.tolist()
-    
-    home_pts_key = next((c for c in cols if 'home_points' in c.lower() or 'homepoints' in c.lower()), 'home_points')
-    away_pts_key = next((c for c in cols if 'away_points' in c.lower() or 'awaypoints' in c.lower()), 'away_points')
+    df = pd.DataFrame(plays)
 
-    processed_df['home_pts'] = pd.to_numeric(processed_df[home_pts_key], errors='coerce').fillna(0).astype(int)
-    processed_df['away_pts'] = pd.to_numeric(processed_df[away_pts_key], errors='coerce').fillna(0).astype(int)
+    # Normalize camelCase columns from cfbd v5 to the snake_case column names app.py expects
+    rename_map = {
+        "offenseTeam": "offense_team",
+        "playType": "play_type",
+        "yardsGained": "yards_gained",
+        "playText": "play_text",
+        "driveNumber": "drive_number",
+        "playNumber": "play_number",
+        "offenseScore": "offense_score",
+        "defenseScore": "defense_score",
+    }
+    for src_col, dst_col in rename_map.items():
+        if src_col in df.columns and dst_col not in df.columns:
+            df[dst_col] = df[src_col]
 
-    processed_df['total_points'] = processed_df['home_pts'] + processed_df['away_pts']
-    processed_df['is_explosive_game'] = processed_df['total_points'] >= 60
-    processed_df['margin'] = (processed_df['home_pts'] - processed_df['away_pts']).abs()
-    
-    return processed_df
+    return df

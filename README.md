@@ -3,8 +3,6 @@
 **Gridiron Metrics** is an interactive dual-league football analytics platform built with **Python** and **Streamlit**, delivering game-level telemetry, play-by-play situational scouting, and historical season recaps across both **College Football (CFB)** and the **NFL** (2004–2026).
 
 * **Live Application:** [Gridiron Metrics on Streamlit Cloud](https://gridiron-metrics.streamlit.app)
-* **GitHub Repository:** [mattk111/Gridiron-Metrics](https://github.com/mattk111/Gridiron-Metrics)
-
 ---
 
 ## 🚀 Core Analytics Modules
